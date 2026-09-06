@@ -2,131 +2,307 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Jot — a photo annotator for Android</title>
-<meta name="description" content="Open a picture, draw on it, crop it, caption it. Everything you put on the photo lies on the same rubber sheet as the photo. Built entirely by AI, in conversation.">
-<meta property="og:title" content="Jot">
-<meta property="og:description" content="A photo annotator for Android. A photograph is a drawing on rubber. Built entirely by AI, in conversation.">
+<meta name="description" content="Jot: a photo annotator for Android. Everything you add lies on the same rubber sheet as the photograph. Built entirely by AI, in conversation.">
+<meta name="theme-color" content="#131314">
+<meta property="og:title" content="Jot — a photo annotator for Android">
+<meta property="og:description" content="Draw on it, cut it, caption it. Everything you add lies on the same rubber sheet as the photograph.">
+<meta property="og:image" content="screen.jpg">
 <meta property="og:type" content="website">
 <style>
 :root{
-  --bg:#141416; --bar:#1d1d20; --ink:#ececed; --dim:#8d8d92;
-  --hot:#f2c23e; --line:#2a2a2e;
+  --bg:#131314;
+  --tile:#2A2A2C;
+  --tile-hi:#343437;
+  --edge:#3A3A3D;
+  --fg:#F2F2F0;
+  --dim:#9A9A97;
+  --gold:#F0C223;
+  --gold-dim:#8A6F17;
+  --sans:system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
+  --mono:ui-monospace,'Roboto Mono',Menlo,Consolas,monospace;
 }
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);
-  font:16px/1.6 -apple-system,Roboto,system-ui,sans-serif;
-  -webkit-font-smoothing:antialiased}
-main{max-width:44rem;margin:0 auto;padding:3rem 1.25rem 5rem}
-h1{font-size:2.6rem;line-height:1.1;margin:0 0 .5rem;letter-spacing:-.02em}
-h1 span{color:var(--hot)}
-.lede{font-size:1.15rem;color:var(--ink);margin:0 0 2rem}
-h2{font-size:1.15rem;margin:2.5rem 0 .75rem;letter-spacing:.06em;
-  text-transform:uppercase;color:var(--dim);font-weight:600}
-p{margin:0 0 1rem}
-ul{margin:0 0 1rem;padding-left:1.2rem}
-li{margin:0 0 .4rem}
-a{color:var(--hot)}
-code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.9em;
-  background:var(--bar);padding:.1em .35em;border-radius:4px}
-pre{background:var(--bar);padding:1rem;border-radius:12px;overflow-x:auto;
-  border:1px solid var(--line)}
-pre code{background:none;padding:0}
-.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));
-  gap:.5rem;margin:0 0 2rem;padding:0;list-style:none}
-.facts li{background:var(--bar);border:1px solid var(--line);border-radius:12px;
-  padding:.75rem .9rem;margin:0}
-.facts b{display:block;color:var(--dim);font-size:.75rem;font-weight:600;
-  text-transform:uppercase;letter-spacing:.06em;margin-bottom:.15rem}
-blockquote{margin:0 0 1rem;padding:.75rem 1rem;border-left:3px solid var(--hot);
-  background:var(--bar);border-radius:0 12px 12px 0;color:var(--ink)}
-footer{margin-top:3rem;padding-top:1.5rem;border-top:1px solid var(--line);
-  color:var(--dim);font-size:.9rem}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg);color:var(--fg);
+  font-family:var(--sans);font-size:16px;line-height:1.62;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:880px;margin:0 auto;padding:0 18px}
+a{color:var(--gold);text-decoration:none}
+a:hover{text-decoration:underline}
+:focus-visible{outline:2px solid var(--gold);outline-offset:3px;border-radius:6px}
+h2{
+  font-size:13px;font-family:var(--mono);letter-spacing:.18em;text-transform:uppercase;
+  color:var(--dim);font-weight:400;margin:0 0 16px;
+}
+p{margin:0 0 15px}
+.lead{font-size:19px;line-height:1.55;color:#DDDDD9;max-width:60ch}
+.dim{color:var(--dim)}
+
+/* hero */
+header{padding:34px 0 8px}
+.mark{display:flex;align-items:center;gap:14px;margin-bottom:20px}
+.mark svg{display:block}
+.mark .pkg{font-family:var(--mono);font-size:11.5px;color:var(--dim);letter-spacing:.04em}
+h1{
+  font-size:clamp(30px,8vw,46px);line-height:1.08;margin:0 0 14px;
+  font-weight:700;letter-spacing:-.02em;max-width:16ch;
+}
+h1 em{font-style:normal;color:var(--gold)}
+
+.shot{
+  margin:26px 0 8px;border:1px solid var(--edge);border-radius:14px;overflow:hidden;
+  background:#0E0E0F;
+}
+.shot img{width:100%;display:block}
+.cap-line{font-family:var(--mono);font-size:11.5px;color:var(--dim);letter-spacing:.06em;margin:0 0 34px}
+
+/* buttons */
+.acts{display:flex;flex-wrap:wrap;gap:10px;margin:22px 0 6px}
+.btn{
+  display:inline-flex;align-items:center;gap:9px;
+  padding:13px 18px;border-radius:12px;min-height:48px;
+  background:var(--tile);border:1px solid var(--edge);color:var(--fg);
+  font-size:14.5px;font-weight:500;text-decoration:none;
+}
+.btn:hover{background:var(--tile-hi);text-decoration:none}
+.btn.primary{background:var(--gold);border-color:var(--gold);color:#1A1500;font-weight:600}
+.btn.primary:hover{background:#FFD230}
+.btn svg{flex:none}
+.btn small{display:block;font-weight:400;font-size:11.5px;opacity:.72;font-family:var(--mono)}
+
+/* sections */
+section{padding:40px 0;border-top:1px solid #222224}
+section:first-of-type{border-top:0}
+
+/* rubber demo */
+.rubber{
+  border:1px solid var(--edge);border-radius:14px;padding:18px;
+  background:#0E0E0F;
+  background-image:
+    linear-gradient(45deg,#191919 25%,transparent 25%),
+    linear-gradient(-45deg,#191919 25%,transparent 25%),
+    linear-gradient(45deg,transparent 75%,#191919 75%),
+    linear-gradient(-45deg,transparent 75%,#191919 75%);
+  background-size:18px 18px;
+  background-position:0 0,0 9px,9px -9px,-9px 0;
+}
+.stage{perspective:1000px;display:flex;justify-content:center;overflow:hidden;border-radius:8px}
+.sheet{position:relative;transform-origin:50% 50%;transition:transform .05s linear;max-width:520px;width:100%}
+.sheet img{width:100%;display:block;border-radius:6px}
+.sheet .tag{
+  position:absolute;left:6%;bottom:9%;
+  font-size:clamp(15px,4.4vw,24px);font-weight:700;letter-spacing:.01em;
+  color:var(--gold);text-shadow:0 2px 10px rgba(0,0,0,.8);
+}
+.ctrl{display:flex;align-items:center;gap:14px;margin-top:16px;flex-wrap:wrap}
+.ctrl label{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+input[type=range]{flex:1;min-width:150px;accent-color:var(--gold);height:32px}
+.mirror{
+  background:var(--tile);border:1px solid var(--edge);color:var(--fg);
+  border-radius:10px;padding:9px 14px;min-height:42px;font-family:var(--mono);
+  font-size:12px;letter-spacing:.08em;cursor:pointer;
+}
+.mirror[aria-pressed=true]{border-color:var(--gold);color:var(--gold)}
+.hint{font-family:var(--mono);font-size:11.5px;color:var(--dim);margin:12px 0 0;line-height:1.7}
+
+/* tool grid — the app's own sheet */
+.tools{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(84px,1fr));gap:9px;
+  background:#1C1C1E;border:1px solid var(--edge);border-radius:16px;padding:10px;
+}
+.tool{
+  background:var(--tile);border-radius:12px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;
+  padding:16px 6px 13px;min-height:78px;
+}
+.tool svg{width:22px;height:22px;stroke:var(--fg);fill:none;stroke-width:1.6;
+  stroke-linecap:round;stroke-linejoin:round}
+.tool span{font-size:12.5px;color:var(--fg)}
+
+/* feature list */
+.feat{list-style:none;margin:0;padding:0}
+.feat li{
+  border-top:1px solid #222224;padding:14px 0 14px 0;
+  display:grid;grid-template-columns:1fr;gap:2px;
+}
+.feat li:first-child{border-top:0}
+.feat b{font-weight:600}
+.feat span{color:var(--dim);font-size:14.5px}
+@media(min-width:600px){
+  .feat li{grid-template-columns:180px 1fr;gap:18px;align-items:baseline}
+}
+
+/* facts */
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:9px}
+.fact{background:var(--tile);border-radius:12px;padding:13px 14px}
+.fact dt{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin-bottom:3px}
+.fact dd{margin:0;font-size:15px;font-weight:500}
+
+blockquote{
+  margin:0;padding:16px 18px;border-left:3px solid var(--gold-dim);
+  background:#1A1A1B;border-radius:0 12px 12px 0;color:#DDDDD9;
+}
+footer{
+  border-top:1px solid #222224;margin-top:20px;padding:22px 0 40px;
+  font-family:var(--mono);font-size:11.5px;letter-spacing:.06em;color:#5C5C5A;
+}
+@media(prefers-reduced-motion:reduce){.sheet{transition:none}}
 </style>
 </head>
 <body>
-<main>
 
-<h1><span>Jot</span> — a photo annotator for Android</h1>
-<p class="lede">Open a picture, draw on it, cut a piece out, put a caption with a
-tail on it, save it. Everything you add lies on the same sheet as the photograph
-and stretches with it.</p>
+<div class="wrap">
 
-<ul class="facts">
-  <li><b>Package</b> io.github.shumtugle.jot</li>
-  <li><b>Languages</b> 14, right-to-left included</li>
-  <li><b>Permissions</b> none</li>
-  <li><b>Network</b> never</li>
-</ul>
+<header>
+  <div class="mark">
+    <svg width="62" height="34" viewBox="0 0 62 34" role="img" aria-label="Jot">
+      <ellipse cx="31" cy="17" rx="29" ry="15" fill="none" stroke="#F0C223" stroke-width="2.4"/>
+      <text x="31" y="17" fill="#F0C223" font-family="system-ui,sans-serif" font-size="16"
+            font-weight="700" text-anchor="middle" dominant-baseline="central">Jot</text>
+    </svg>
+    <span class="pkg">io.github.shumtugle.jot · v3.327.0 · Android</span>
+  </div>
 
-<h2>The idea it is built on</h2>
-<p>A photograph is a drawing on rubber. A stroke, a caption, a shape, an inserted
-picture — all of them lie on that rubber. Stretch it and they stretch. Mirror it
-and the caption mirrors too: unreadable is the answer, not a defect.</p>
-<p>Three things are deliberately not rubber. The checkerboard table is the room
-the sheet lies in. The guide lines are a ruler held beside the sheet — they stay
-on the axes while the sheet tilts, or there would be nothing left to straighten
-by. The crop frame is scissors, not drawing.</p>
+  <h1>A photo annotator that treats the picture as <em>rubber</em>.</h1>
+  <p class="lead">Open a photograph, draw on it, cut it, caption it, save it. Everything you add lies on the same sheet as the photograph itself — and stretches with it.</p>
 
-<h2>What it does</h2>
-<ul>
-  <li><b>Draw and cut.</b> Brush and marker, cut-out by shape or by colour, soft
-      edges, fill of what was taken away.</li>
-  <li><b>Correct.</b> Nine quantities on one slider, and a colour mixer: eight
-      stretches of the hue wheel, each with its own hue, saturation and
-      lightness. Touch the greenery without touching the brickwork.</li>
-  <li><b>Glass.</b> Blur, sharpen, focus, tilt, aberration, frames.</li>
-  <li><b>Crop and turn.</b> Free or fixed ratio, quarter turns, mirror, fine
-      angle — fitted together rather than one after another.</li>
-  <li><b>Captions and shapes</b> with a full font stack, laid on the sheet like
-      everything else.</li>
-  <li><b>Session memory.</b> Close the app mid-work and the work is still
-      there.</li>
-  <li><b>Landscape.</b> The panels stand in a column at the right and the
-      picture takes the whole left side — but only where that actually helps.
-      On a folding phone opened flat, a column would take more from the picture
-      than the bars below it, so the bars stay.</li>
-</ul>
+  <div class="acts">
+    <a class="btn primary" href="https://github.com/Shumtugle/jot/raw/main/jot-3.327.0.apk">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 12 5 5 5-5"/><path d="M4 21h16"/></svg>
+      <span>Download APK<small>jot-3.327.0.apk</small></span>
+    </a>
+    <a class="btn" href="https://github.com/Shumtugle/jot">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 17-5-5 5-5"/><path d="m15 7 5 5-5 5"/></svg>
+      <span>Source<small>github.com/Shumtugle/jot</small></span>
+    </a>
+    <a class="btn" href="https://claude.ai">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v18"/><path d="M5.5 7.5 18.5 16.5"/><path d="M18.5 7.5 5.5 16.5"/></svg>
+      <span>Built with Claude<small>claude.ai</small></span>
+    </a>
+  </div>
+</header>
 
-<h2>How it is built</h2>
-<p>No Android Studio, no Gradle, nothing compiled. Jot is a WebView shell around
-one self-contained HTML page. A release is a swap of two files inside a zip and
-four numbers kept in agreement.</p>
-<pre><code>sh src/build.sh     # concatenate the page
-node tools/count.js # run the bench
-</code></pre>
-<p>Every line of it was generated by AI through plain conversation. Not a single
-line was written by a human hand.</p>
+<div class="shot">
+  <img src="screen.jpg" alt="Jot open on a photograph of apples on a branch, with the tool sheet on the right: fix, zoom, history, geometry, adjust, draw, text+, filter, camera, montage, crop, sheet.">
+</div>
+<p class="cap-line">The tool sheet sits beside the picture, never on top of it.</p>
 
-<h2>What holds it together</h2>
-<p>A bench of 22 suites and over 2360 checks, run before every release. Zero
-failures is a condition of building, not a wish.</p>
-<p>The checks are unusual in one way: most of them guard <i>reasons</i> rather
-than behaviour alone.</p>
-<blockquote>A silent <code>catch</code> without a stated reason fails the bench.
-A number living in two places fails the bench. A rule whose subject no longer
-exists fails the bench — because a rule without a subject will eventually be
-read as if it still applied.</blockquote>
-<p>Reading the code is not enough and the bench knows it. Before any release the
-page is loaded whole and asked whether every button in it got dressed: a dead
-build passes two thousand static checks and opens on the phone with blank
-buttons. That has happened, which is why the step exists.</p>
+<section>
+  <h2>The governing idea</h2>
+  <blockquote>A photograph is a drawing on rubber. A stroke, a caption, a shape, an inserted picture — all of them lie on that rubber and stretch with it.</blockquote>
+  <p>Mirror the sheet and the caption mirrors too. Unreadable is the answer, not a defect.</p>
+  <p>Three things are deliberately <em>not</em> rubber: the checkerboard table the sheet lies on, the guide lines held beside it, and the crop frame. Those are scissors, not drawing.</p>
 
-<h2>Trace</h2>
-<p>The app keeps a short trace of what changed the state of things: screen
-entered, tool taken, edit made, step back, open, save. It is readable from the
-settings, behind the beta switch. Messages are keyed rather than spelled out at
-the point of failure, so the trace speaks one language and the code carries
-none.</p>
+  <div class="rubber">
+    <div class="stage">
+      <div class="sheet" id="sheet">
+        <img src="photo.jpg" alt="Apples on a branch, with a caption lying on the same sheet.">
+        <span class="tag">on the same sheet</span>
+      </div>
+    </div>
+    <div class="ctrl">
+      <label for="pull">Pull</label>
+      <input id="pull" type="range" min="-60" max="60" value="0" step="1">
+      <button class="mirror" id="mirror" aria-pressed="false">Mirror</button>
+    </div>
+  </div>
+  <p class="hint">Drag the slider. The caption is not an overlay — it deforms because it is part of the sheet. Mirror it and it becomes unreadable, which is the correct result.</p>
+</section>
 
-<h2>Licence</h2>
-<p>The code is published as it is built. Do what you like with it; it comes
-without warranty of any kind.</p>
+<section>
+  <h2>The tool sheet</h2>
+  <div class="tools" id="tools"></div>
+  <p class="hint">Twelve tools, plus open, save, share and undo on the row beneath them.</p>
+</section>
+
+<section>
+  <h2>What it does</h2>
+  <ul class="feat">
+    <li><b>Draw, cut, fill</b><span>Brush and marker, cut-out by shape or by colour, soft edges, and fill of what was cut away.</span></li>
+    <li><b>Correction and glass</b><span>Brightness, contrast, saturation and the rest; blur, sharpen, focus, tilt, aberration, frames.</span></li>
+    <li><b>Crop and turn</b><span>Free or fixed ratio, quarter turns, mirror, fine angle.</span></li>
+    <li><b>Captions and shapes</b><span>A full font stack, laid on the sheet like everything else.</span></li>
+    <li><b>Fourteen languages</b><span>Right-to-left included.</span></li>
+    <li><b>Session memory</b><span>Close the app mid-work and the work is still there.</span></li>
+  </ul>
+</section>
+
+<section>
+  <h2>How it is built</h2>
+  <p>No Android Studio, no Gradle. A WebView shell wrapped around one self-contained HTML page: the page is a straight concatenation of a shell and the scripts, in an order that matters, dropped into the APK as an asset. Nothing is compiled. A release is a swap of two HTML files inside a zip and four numbers kept in agreement.</p>
+  <p>Every line was generated by AI through plain conversation. No human wrote one.</p>
+
+  <h2 style="margin-top:30px">What holds it together</h2>
+  <p>A bench of 22 suites and more than 2350 checks runs before every release, and zero failures is a condition of building rather than a wish.</p>
+  <p>The checks are unusual in one way: most of them guard reasons, not just behaviour. A silent <code>catch</code> without a stated reason fails the bench. A number that lives in two places fails the bench. A rule whose subject no longer exists fails the bench — because a rule without a subject will eventually be read as if it still applied.</p>
+</section>
+
+<section>
+  <h2>Facts</h2>
+  <dl class="facts" style="margin:0">
+    <div class="fact"><dt>Version</dt><dd>3.327.0</dd></div>
+    <div class="fact"><dt>Package</dt><dd style="font-family:var(--mono);font-size:12.5px">io.github.shumtugle.jot</dd></div>
+    <div class="fact"><dt>Platform</dt><dd>Android</dd></div>
+    <div class="fact"><dt>Languages</dt><dd>14, RTL included</dd></div>
+    <div class="fact"><dt>Licence</dt><dd>MIT</dd></div>
+    <div class="fact"><dt>Written by</dt><dd>AI, in conversation</dd></div>
+  </dl>
+  <p class="hint">The APK is unsigned by any store, so Android will ask you to allow the install. The code is published as it is built and comes without warranty of any kind.</p>
+</section>
 
 <footer>
-generated by AI · <a href="https://github.com/Shumtugle/jot">github.com/Shumtugle/jot</a>
+  <a href="https://shumtugle.github.io/">shumtugle.github.io</a> · Jot · MIT
 </footer>
 
-</main>
+</div>
+
+<script>
+(function(){
+'use strict';
+var TOOLS=[
+ ['fix','<rect x="4" y="4" width="16" height="16" rx="3"/><path d="m9 15 6-6"/><circle cx="15.5" cy="8.5" r="1.2"/>'],
+ ['zoom','<rect x="3" y="5" width="18" height="14" rx="2"/><rect x="8" y="9" width="8" height="6" rx="1"/>'],
+ ['history','<path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1"/><path d="M3 4v4h4"/><path d="M12 8v4l3 2"/>'],
+ ['geometry','<rect x="3.5" y="3.5" width="17" height="17" rx="2.5"/><path d="M7 17 17 7"/>'],
+ ['adjust','<path d="M4 8h10"/><circle cx="17" cy="8" r="2.4"/><path d="M20 16H10"/><circle cx="7" cy="16" r="2.4"/>'],
+ ['draw','<path d="M3 15c3-8 7-8 9-4s5 5 9-2"/>'],
+ ['text+','<path d="M3 6h11"/><path d="M8.5 6v12"/><path d="M17 10v8"/><path d="M13 14h8"/>'],
+ ['filter','<circle cx="8" cy="12" r="4.5"/><circle cx="16" cy="12" r="4.5"/>'],
+ ['camera','<path d="M3 8.5A1.5 1.5 0 0 1 4.5 7H8l1.4-2h5.2L16 7h3.5A1.5 1.5 0 0 1 21 8.5v9A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5z"/><circle cx="12" cy="13" r="3.4"/>'],
+ ['montage','<rect x="3" y="7" width="12" height="11" rx="2"/><path d="M9 7V5.5A1.5 1.5 0 0 1 10.5 4h9A1.5 1.5 0 0 1 21 5.5v9a1.5 1.5 0 0 1-1.5 1.5H18"/>'],
+ ['crop','<path d="M6.5 2v15.5H22"/><path d="M2 6.5h15.5V22"/>'],
+ ['sheet','<path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/>']
+];
+var box=document.getElementById('tools');
+TOOLS.forEach(function(t){
+  var d=document.createElement('div');
+  d.className='tool';
+  d.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true">'+t[1]+'</svg><span>'+t[0]+'</span>';
+  box.appendChild(d);
+});
+
+var sheet=document.getElementById('sheet'),
+    pull=document.getElementById('pull'),
+    mir=document.getElementById('mirror'),
+    flipped=false;
+function apply(){
+  var v=Number(pull.value),
+      sx=(1-Math.abs(v)/260)*(flipped?-1:1);
+  sheet.style.transform=
+    'perspective(1000px) rotateY('+(v*0.55)+'deg) scaleX('+sx.toFixed(3)+') skewY('+(v*0.045)+'deg)';
+}
+pull.addEventListener('input',apply);
+mir.addEventListener('click',function(){
+  flipped=!flipped;
+  mir.setAttribute('aria-pressed',flipped?'true':'false');
+  apply();
+});
+apply();
+})();
+</script>
 </body>
 </html>
