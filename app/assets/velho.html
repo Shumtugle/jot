@@ -1,0 +1,1722 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Jot tiff</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:#000;color:#f2f2f4;
+  font:15px/1.4 -apple-system,Roboto,system-ui,sans-serif;user-select:none}
+#logo{width:140px;height:90px;display:block;margin:0 auto;fill:none;stroke:#e01b24;stroke-width:4.6;stroke-linecap:round;stroke-linejoin:round}
+#wrap{height:100%;display:flex;flex-direction:column;justify-content:center;padding:24px;gap:14px}
+h1{font-size:19px;margin:0 0 4px;font-weight:700}
+#s{color:#9a9aa2;font-size:14px;min-height:40px;white-space:pre-line}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+button{flex:1 1 40%;min-height:46px;border:0;border-radius:12px;background:#26262b;
+  color:#f2f2f4;font:inherit;font-weight:600}
+button.go{background:#e01b24;color:#fff}
+button:disabled{opacity:.35}
+.tiny{color:#5a5a63;font-size:12px}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div>
+    <svg id="logo" viewBox="17 28 74 48"><path d="M25.1 46.6 C25.8 45.6 27.4 42.4 29.5 40.6 C31.6 38.8 34.5 36.9 37.6 35.6 C40.7 34.3 44.7 33.4 48.2 33.0 C51.8 32.5 55.6 32.7 58.9 33.0 C62.2 33.3 65.3 34.0 68.2 34.8 C71.2 35.5 73.9 36.3 76.5 37.4 C79.1 38.4 81.9 39.6 83.8 41.2 C85.8 42.7 87.6 44.7 88.2 46.7 C88.9 48.6 88.6 51.0 87.7 53.1 C86.7 55.2 84.7 57.3 82.5 59.1 C80.4 60.9 77.6 62.4 74.9 63.9 C72.2 65.3 69.4 66.5 66.4 67.6 C63.3 68.8 60.2 69.9 56.8 70.7 C53.4 71.4 49.5 72.0 45.9 72.0 C42.4 72.0 38.6 71.5 35.6 70.5 C32.7 69.6 30.1 68.0 28.3 66.4 C26.4 64.8 25.3 62.8 24.5 61.0 C23.6 59.1 23.2 57.2 23.0 55.3 C22.8 53.4 22.6 51.4 23.1 49.3 C23.7 47.3 24.5 45.1 26.1 43.1 C27.8 41.1 30.3 39.1 33.2 37.6 C36.0 36.1 41.6 34.8 43.3 34.2" fill="none" stroke="currentColor" stroke-width="4.6" stroke-linecap="round"/><path d="M43.5 41 L43.5 56 C43.5 60.5 38 62 35 58.5" fill="none" stroke="currentColor" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M54 45.5 a7.5 7.5 0 1 0 0.1 0 z" fill="none" stroke="currentColor" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M67.5 40 L67.5 57.5 C67.5 61 70.5 61.5 72.5 60" fill="none" stroke="currentColor" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M63 46 L73 46" fill="none" stroke="currentColor" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/></svg><h1>Jot tiff</h1>
+    <div id="s">…</div>
+  </div>
+  <div class="row">
+    <button id="bSave" class="go" disabled></button>
+    <button id="bShare" disabled></button>
+  </div>
+  <div class="row">
+    <button id="bJot" disabled></button>
+    <button id="bOpen"></button>
+  </div>
+  <div class="tiny" id="vTiny"></div>
+</div>
+<script>
+
+var ERRS = [];
+
+function errClock(){
+  var d = new Date(), p = function(n){ return (n < 10 ? '0' : '') + n; };
+  var ms = d.getMilliseconds(), m3 = (ms < 10 ? '00' : (ms < 100 ? '0' : '')) + ms;
+  return p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds()) + '.' + m3;
+}
+
+var ERR_SEEN = {};
+function errOnce(key, m){
+  if (ERR_SEEN[key]) return;
+  ERR_SEEN[key] = 1;
+  errNote(m, 0);
+}
+
+var CLOCKRE = /^\d\d:\d\d:\d\d[.\d]*  /;
+
+function logNote(s){
+  var t = String(s || '');
+  if (t.length > 160) t = t.slice(0, 160);
+  if (ERRS.length){
+    var prev = ERRS[ERRS.length - 1];
+
+    var body = prev.replace(CLOCKRE, '').replace(/ ×\d+$/, '');
+    if (body === t){
+      var n = /×(\d+)$/.exec(prev);
+      ERRS[ERRS.length - 1] = prev.replace(/ ×\d+$/, '') + ' ×' + ((n ? parseInt(n[1], 10) : 1) + 1);
+      return;
+    }
+  }
+  ERRS.push(errClock() + '  ' + t);
+  if (ERRS.length > 200) ERRS.shift();
+}
+
+function logT(key, a, b){
+  var ru = (typeof LOG_RU === 'object' && LOG_RU) ? LOG_RU : null;
+  var s = (ru && ru[key]) || (typeof LOG_EN === 'object' && LOG_EN[key]) || key;
+  if (a !== undefined && a !== null)
+    s = s.replace('{a}', (a && a.message) ? a.message : String(a));
+  if (b !== undefined && b !== null)
+    s = s.replace('{b}', (b && b.message) ? b.message : String(b));
+  return s;
+}
+
+function errNote(m, ln){
+  var t = String(m || 'ошибка');
+  if (ln) t += ' :' + ln;
+
+  logNote('! ' + t);
+}
+
+var PERFN = 100;
+var PERFLIM = 16;
+
+function perfBucket(){ return { i: 0, n: 0, buf: [], worst: 0, over: 0, all: 0 }; }
+var PERF = { paint: perfBucket(), photo: perfBucket(),
+             tail: perfBucket(), stack: perfBucket() };
+
+function perfNow(){
+  return (typeof performance !== 'undefined' && performance && performance.now)
+    ? performance.now() : Date.now();
+}
+
+function perfAdd(b, ms){
+  if (!b || !(ms >= 0)) return;
+  b.buf[b.i] = ms;
+  b.i = (b.i + 1) % PERFN;
+  if (b.n < PERFN) b.n++;
+  if (ms > b.worst) b.worst = ms;
+
+  b.all++;
+  if (ms > PERFLIM) b.over++;
+}
+
+function perfAvg(b){
+  if (!b || !b.n) return 0;
+  var s = 0;
+  for (var i = 0; i < b.n; i++) s += b.buf[i];
+  return s / b.n;
+}
+
+function perfWatch(name, ms){
+  if (ms <= PERFLIM) return;
+  if (typeof logNote === 'function') logNote('отклик: ' + name + ' выше порога');
+}
+
+function perfLine(){
+  var f = function(b){
+    var pc = b.all ? Math.round(b.over * 100 / b.all) : 0;
+    return perfAvg(b).toFixed(1) + '/' + b.worst.toFixed(1) + '/' + pc + '%';
+  };
+  return 'paint ' + f(PERF.paint) + '   photo ' + f(PERF.photo) +
+         '   tail ' + f(PERF.tail) + '   stack ' + f(PERF.stack) +
+         '   ms avg/worst/over ' + PERFLIM;
+}
+
+if (typeof window !== 'undefined'){
+  window.onerror = function(m, src, ln){ errNote(m, ln); return false; };
+  window.addEventListener('unhandledrejection', function(e){
+    errNote(e && e.reason ? (e.reason.message || e.reason) : 'обещание отвергнуто', 0);
+  });
+}
+
+'use strict';
+
+var L = {};
+
+L.en = {
+  gFTwin:'double', gFCorn:'corners', gFBevel:'bevel', gFDash:'dashed',
+
+  nSize:'set a size, then choose how to apply it',
+
+  hist:'history',
+
+  gFrames:'frames', fEdge:'edge',
+
+  gFLine:'line', gFMat:'mat', gFShade:'shade', gFNeg:'negative', gFShell:'shell', fHeight:'height',
+  gAbbr:'lens',
+
+  camKept:'original kept',
+
+  camEdit:'to editor', camPut:'insert', camStk:'to pack',
+
+  hNoShell:'camera needs the app, not a browser tab',
+
+  cam:'camera',
+
+  cutTool:'montage',
+
+  gWhole:'whole sheet', gFrameOnly:'photograph only',
+
+  rndTo:'filters',
+
+  gRnd:'random', rndNext:'next', rndPrev:'back',
+
+  gAfr:'africa', gHel:'helsinki', gDist:'distance',
+
+  tiltVert:'vertical', tiltHorz:'horizontal',
+
+  vWait:'reading…',
+  vOk:'done: %p, %s. PDF built without re-encoding.',
+  vTiny:'TIFF into PDF without unpacking: the compressed stream is carried as is.',
+  vSave:'save',
+  vShare:'share',
+  vOpen:'choose file',
+  vJot:'open in Jot',
+  vSaved:'saved to Download/Jot',
+  vNone:'open a TIFF or share one with Jot TIFF',
+  vNotTiff:'not a TIFF',
+  vTiled:'tiled TIFF is not supported',
+  vPlanar:'planar channels are not supported',
+  vChannels:'that channel count is not supported',
+  vDepth:'that bit depth is not supported',
+  vCompression:'that compression is not supported',
+  vPredictor:'that predictor is not supported',
+  vBroken:'file is broken',
+  vFail:'failed: ',
+  vKb:'KB',
+
+  desk:'desk',
+  lines:'lines', shapes:'shapes',
+  accent:'accent', help:'how it works',
+  place:'place', sticker:'picture', rot:'rotation',
+  insert:'insert', pads:'margins', legend:'signs', icons:'icons only', home:'home',
+  turn:'sheet', turnR:'right', flipH:'mirror', back:'home', more:'more',
+  add:'add', fromFile:'from file', put:'place', stickers:'stickers',
+  toPack:'to stickers',
+  capNew:'new', props:'properties',
+  nCaps:'tap a caption to take it, tap again for its properties',
+  nCapsNone:'no captions yet — new puts one on the picture', nStk:'the pack is empty — add a picture and it stays here',
+  nStkUse:'tap a sticker to choose it', nStkPut:'tap it again to put it on the picture',
+  hStkFail:'the pack could not be written', hStkFull:'the pack is full: ',
+  hStkSmall:'brought down to the limit, px: ', hToPack:'the work is in the pack',
+  nPads:'drag a red grip inward from any edge — the sheet grows on that side and the backdrop fills it',
+  size:'size', keepProp:'proportions', mPad:'frames', mNone:'reset',
+  hue:'hue', sat:'saturation', val:'brightness', pick:'choose',
+  own:'own colour',
+  above:'on top',
+  draw:'draw', brush:'brush', eraser:'eraser', line:'line', rect:'rectangle', oval:'oval', width:'width', dash:'dashed', fillIn:'filled',
+  tri:'triangle', diam:'diamond', hex:'hexagon', star:'star', arc:'arc', sel:'select', eye:'eyedropper',
+  hEye:'tap the picture to take its colour',
+  caps:'caption', back:'home', more:'more', frame:'frame',
+  uAngle:'angle', uFocus:'focal',
+  fix:'fix', ezoom:'zoom', etext:'text+', egeo:'geometry', hFixCap:'went as far as the sliders go',
+  adjust:'adjust', aBr:'brightness', aCo:'contrast', aSa:'saturation', aTe:'temperature', aGa:'gamma', aSh:'sharpness', aBl:'blur', aGr:'grain', aVi:'vignette', peek:'peek', aMix:'colors', mHue:'hue', mSat:'saturation', mLum:'lightness', aReset:'reset', hSlow:'sharpness and blur make saving slower',
+  menu:'menu', open:'open', undo:'undo', rotate:'rotate', save:'save', share:'share',
+  whole:'fit whole', reboot:'restart',
+  view:'view', edit:'edit', bubble:'balloon', plate:'label', text:'text', arrow:'arrow',
+  crop:'crop', done:'done', del:'delete', size:'size', caption:'caption',
+  opacity:'opacity', round:'rounding', free:'free', orig:'original', apply:'crop',
+  soft:'softness', fold:'panel', blurIn:'blur', mark:'marker', reveal:'reveal',
+  glass:'filter', gNone:'none', power:'strength',
+
+zoom:'zoom', cutBack:'restore',
+  cutFree:'lasso', cutColor:'wand', tol:'tolerance',
+  hCut:'erasing the photograph to transparency; only PNG keeps it',
+  legFree:'free ratio', legPoly:'lasso', legColor:'by colour', legBack:'back',
+  guide:'guides', uNone:'off', uThirds:'thirds', uPhi:'golden',
+  uDiag:'diagonals', uCenter:'centre', uGrid:'grid', uSafe:'safe area',
+  gGray:'grey', gBw:'b/w', gNeg:'negative', gSepia:'sepia', gVint:'vintage',
+  gFade:'faded', gPolar:'polaroid', gCyan:'cyanotype',
+  gDuo:'duotone', gByc:'by colour', gIr:'infrared', gXray:'x-ray',
+  gPost:'posterise',
+  gTherm:'thermal', gMosaic:'mosaic', gPop:'pop art', gEmboss:'emboss', gAuto:'auto', soft:'soft', gStrong:'strong', duoPair:'tones', paste:'paste', copy:'copy', hVoice:'voice', hvOnce:'once', hvAlways:'always', hCopyHint:'hold the move handle to copy — the floating button pastes', hCopied:'copied — the floating button pastes it', hClipTool:'the cursor takes and lays down — take it first', hLite:'opened lightened:', alpha:'opacity', hLiteOn:'the next photograph opens at eight megapixels', hLiteOff:'photographs open whole again', lite:'lighter', ltOn:'on', ltOff:'off', soon:'later', duoDark:'shadow', duoLite:'light', duoFlip:'swap',
+  hDuoOnly:'two tones are used by the duotone filter only',
+  fb:'feedback', fbOff:'silence', fbSnd:'sound', hvOff:'short', hvOn:'all',
+  hBlur:'only a closed shape can blur',
+  lang:'language', qual:'saving', about:'about', close:'close',
+  name:'file name', saveHere:'to {dir}', saveAs:'to a folder', page:'page',
+  shape:'shape', tilt:'tilt', bgColor:'colour',
+  vert:'vertical', horz:'horizontal', shRect:'rectangle', shRound:'rounded', shOval:'circle',
+  theme:'appearance', reset:'reset settings', links:'links', settings:'settings',
+  thBlack:'black', thNight:'midnight', thPine:'pine', thJot:'Jot', thGrey:'grey 18%', thWarm:'warm', thLight:'light',
+  q92:'JPEG 92', q100:'JPEG 100', qpng:'PNG', qpdf:'PDF',
+  hTap:'place it, aim the tail — the keyboard comes on a tap',
+  hArrow:'yellow ring is the point, red one the width',
+  hCrop:'drag the corners; a circle needs a 1:1 ratio',
+  hView:'two fingers to zoom, tap to leave',
+  find:'find', probe:'probe', tol:'tolerance', popOne:'one colour',
+  cutLine:'line', cutKeep:'keep', cutTake:'take', cutGive:'give back',
+  cutFill:'fill',
+  hFlat:'JPEG has no transparency — empty places will be black',
+  turnSpin:'right', turnLeft:'left', turnMir:'mirror', turnFlip:'upside down',
+  hSoon:'not built yet',
+  hRevGone:'nothing left to undo, so the colour is back',
+  hRevOn:'brush now brings the colour back; eraser closes it again',
+  hPopPick:'tap the colour that should stay', hPopGone:'the colour came back',
+  hSaved:'saved', hNoImg:'open a photograph first', hPick:'choose a file',
+  hFail:'could not open that file', hMem:'not enough memory for full size', hDead:'the sheet could not be built and nothing was written; the file is untouched', hThin:'the sheet came out blank where the photograph should be — check the file before you rely on it', hThinBig:'the sheet came out blank where the photograph should be; the size is close to the limit, so try saving smaller',
+  hMore:'tap it again — colour, rotation, delete',
+  hSel:'nothing is drawn now: tap a shape to move it, tap again for its properties',
+  hUndo:'nothing to undo', hNoPads:'margins are turned off in this build', hNoSize:'a set size is turned off in this build', hUndoGone:'the edits came back with the file; there are no undo steps to them', hBlurOnly:'only a closed shape can be a blur window', hPickOne:'choose an element first, then raise it', hBack:'work restored from last time', hLost:'the photograph was not kept: the markup could not be restored', hBig:'PNG at full size runs to tens of megabytes',
+  hPdf:'pages in this document: ',
+  hReset:'settings reset',
+  hLimit:'limit: 12000 px per side and 40 megapixels — applied ',
+  hIns:'drag to move, red ring resizes, opacity is in the editor',
+  hPads:'drag a red grip from any edge to add a margin'
+};
+
+L.ru = {
+  gFTwin:'двойная', gFCorn:'уголки', gFBevel:'фаска', gFDash:'штрих',
+
+  nSize:'наберите размер и выберите, как его применить',
+
+  hist:'история',
+
+  gFrames:'рамки', fEdge:'место',
+
+  gFLine:'линия', gFMat:'паспарту', gFShade:'тень', gFNeg:'негатив', gFShell:'ракушка', fHeight:'рост',
+  gAbbr:'объектив',
+
+  camKept:'оригинал сохранён',
+
+  camEdit:'в редактор', camPut:'вложить', camStk:'в стикеры',
+
+  hNoShell:'камера работает только в приложении',
+
+  cam:'камера',
+
+  cutTool:'монтаж',
+
+  gWhole:'весь лист', gFrameOnly:'только снимок',
+
+  rndTo:'фильтры',
+
+  gRnd:'рандом', rndNext:'дальше', rndPrev:'назад',
+
+  gAfr:'Африка', gHel:'Хельсинки', gDist:'дистанция',
+
+  tiltVert:'вертикаль', tiltHorz:'горизонталь',
+
+  vWait:'читаю файл…',
+  vOk:'готово: %p, %s. PDF собран без пересжатия.',
+  vTiny:'TIFF в PDF без распаковки: сжатый поток переносится как есть.',
+  vSave:'сохранить',
+  vShare:'поделиться',
+  vOpen:'выбрать файл',
+  vJot:'открыть в Jot',
+  vSaved:'сохранено в Download/Jot',
+  vNone:'откройте файл TIFF или поделитесь им с Jot TIFF',
+  vNotTiff:'это не TIFF',
+  vTiled:'плиточный TIFF не поддерживается',
+  vPlanar:'раздельные каналы не поддерживаются',
+  vChannels:'такое число каналов не поддерживается',
+  vDepth:'такая глубина не поддерживается',
+  vCompression:'сжатие не поддерживается',
+  vPredictor:'предсказатель не поддерживается',
+  vBroken:'файл повреждён',
+  vFail:'не вышло: ',
+  vKb:'КБ',
+
+  desk:'стол',
+  lines:'линии', shapes:'формы',
+  accent:'акцент', help:'как устроено',
+  place:'вставка', sticker:'картинка', rot:'поворот',
+  insert:'вставка', pads:'поля', legend:'значки', icons:'только значки', home:'дом',
+  turn:'лист', turnR:'вправо', flipH:'зеркало', back:'домой', more:'ещё',
+  add:'добавить', fromFile:'из файла', put:'поставить', stickers:'стикеры',
+  toPack:'в стикеры',
+  capNew:'новая', props:'свойства',
+  nCaps:'коснитесь подписи, чтобы взять её, второе касание откроет свойства',
+  nCapsNone:'подписей пока нет — «новая» поставит первую', nStk:'пак пуст — добавьте картинку, и она останется здесь',
+  nStkUse:'коснитесь стикера, чтобы выбрать', nStkPut:'коснитесь ещё раз, чтобы поставить на снимок',
+  hStkFail:'пак не записался', hStkFull:'в паке больше не помещается: ',
+  hStkSmall:'уменьшено до предела, точек: ', hToPack:'работа лежит в паке',
+  nPads:'тяните красную точку от края внутрь — лист с этой стороны вырастет, а поле заполнит подложка',
+  size:'размер', keepProp:'пропорции', mPad:'поля', mNone:'сброс',
+  hue:'тон', sat:'насыщенность', val:'яркость', pick:'выбрать',
+  own:'свой цвет',
+  above:'поверх',
+  draw:'рисование', brush:'кисть', eraser:'ластик', line:'линия', rect:'прямоугольник', oval:'овал',
+  tri:'треугольник', diam:'ромб', hex:'шестиугольник', star:'звезда', arc:'дуга', sel:'выбор', eye:'пипетка',
+  hEye:'коснитесь снимка — возьму его цвет', width:'толщина', dash:'пунктир', fillIn:'заливка',
+  caps:'подпись', back:'домой', more:'ещё', frame:'кадр',
+  uAngle:'угол', uFocus:'фокус',
+  fix:'исправление', ezoom:'зум', etext:'текст+', egeo:'геометрия', hFixCap:'сделала сколько смогли ползунки',
+  adjust:'коррекция', aBr:'яркость', aCo:'контраст', aSa:'насыщенность', aTe:'температура', aGa:'гамма', aSh:'резкость', aBl:'размытие', aGr:'зерно', aVi:'виньетка', peek:'сравнить', aMix:'цвета', mHue:'оттенок', mSat:'насыщенность', mLum:'яркость', aReset:'сброс', hSlow:'резкость и размытие замедляют сохранение',
+  menu:'меню', open:'открыть', undo:'отменить', rotate:'поворот', save:'сохранить',
+  whole:'по размеру', reboot:'перезагрузка',
+  share:'поделиться', view:'просмотр', edit:'правка', bubble:'облако', plate:'плашка',
+  text:'текст', arrow:'стрелка', crop:'обрезка', done:'готово', del:'удалить',
+  size:'размер', caption:'подпись', opacity:'прозрачность', round:'скругление',
+  free:'свободно', orig:'исходное', apply:'обрезать', lang:'язык',
+  soft:'мягкость', fold:'панель', blurIn:'размытие', mark:'маркер', reveal:'проявить',
+  glass:'фильтр', gNone:'без фильтра', power:'сила', zoom:'увеличение', cutBack:'вернуть',
+  cutFree:'лассо', cutColor:'палочка', tol:'допуск',
+  hCut:'стираем снимок до прозрачности; прозрачное сохраняется только в PNG',
+  guide:'линейка', uNone:'без линий', uThirds:'трети', uPhi:'сечение',
+  uDiag:'диагонали', uCenter:'центр', uGrid:'клетка', uSafe:'поля',
+  gGray:'серый', gBw:'ч/б', gNeg:'негатив', gSepia:'сепия', gVint:'винтаж',
+  gFade:'выцветание', gPolar:'полароид', gCyan:'цианотипия',
+  gDuo:'дуотон', gByc:'по цвету', gIr:'инфракрасный', gXray:'рентген',
+  gPost:'постеризация',
+  gTherm:'тепловизор', gMosaic:'мозаика', gPop:'поп-арт', gEmboss:'тиснение', gAuto:'авто', soft:'мягко', gStrong:'сильно', duoPair:'тона', paste:'вставить', copy:'копия', hVoice:'голос', hvOnce:'один раз', hvAlways:'всегда', hCopyHint:'удержание на ручке переноса копирует — вставит плавающая кнопка', hCopied:'скопировано — вставляет плавающая кнопка', hClipTool:'курсор берёт и кладёт — возьмите его', hLite:'открыт облегчённым:', alpha:'прозрачность', hLiteOn:'следующий снимок откроется в восемь мегапикселей', hLiteOff:'снимки снова открываются целиком', lite:'облегчить', ltOn:'да', ltOff:'нет', soon:'позже', duoDark:'тень', duoLite:'свет', duoFlip:'переставить',
+  hDuoOnly:'два тона нужны только дуотону',
+  fb:'отклик', fbOff:'тишина', fbSnd:'звук', hvOff:'коротко', hvOn:'всё',
+  hBlur:'размывать можно только замкнутую фигуру',
+  qual:'сохранение', about:'о программе', close:'закрыть', name:'имя файла',
+  saveHere:'в {dir}', saveAs:'в папку', page:'страница', shape:'форма', tilt:'наклон', bgColor:'цвет',
+  vert:'вертикально', horz:'горизонтально', shRect:'прямоугольник', shRound:'скруглённый',
+  shOval:'круг', theme:'оформление', reset:'сбросить настройки', links:'ссылки',
+  settings:'настройки', thBlack:'чёрный', thNight:'полночь', thPine:'хвоя',thJot:'Jot', thGrey:'серый 18%',
+  thWarm:'тёплый', thLight:'светлый',
+  q92:'JPEG 92', q100:'JPEG 100', qpng:'PNG', qpdf:'PDF',
+  hTap:'поставьте объект, наведите хвост — клавиатура придёт по касанию',
+  hArrow:'жёлтая точка — остриё, красная — толщина',
+  hCrop:'тяните углы; для круга нужна пропорция 1:1',
+  hView:'два пальца — увеличить, касание — выйти',
+  find:'поиск', probe:'дознание', tol:'допуск', popOne:'цвет один',
+  cutLine:'линия', cutKeep:'оставить', cutTake:'снять', cutGive:'вернуть',
+  cutFill:'заливка',
+  hFlat:'JPEG прозрачности не умеет — пустое станет чёрным',
+  turnSpin:'вправо', turnLeft:'влево', turnMir:'зеркало', turnFlip:'вверх дном',
+  hSoon:'ещё не сделано',
+  hRevGone:'отменять больше нечего, цвет вернулся',
+  hRevOn:'кисть возвращает цвет, ластик закрывает обратно',
+  hPopPick:'коснитесь цвета, который останется', hPopGone:'цвет вернулся',
+  hSaved:'сохранено', hNoImg:'сначала откройте снимок', hPick:'выберите файл',
+  hFail:'файл не открылся — выберите другой', hMem:'не хватило памяти на полный размер', hDead:'лист не собрался, файл не записан — прежний цел', hThin:'лист вышел пустым там, где должен быть снимок — проверьте файл, прежде чем на него полагаться', hThinBig:'лист вышел пустым там, где должен быть снимок; размер у предела — попробуйте сохранить меньше',
+  hMore:'коснитесь ещё раз — цвет, поворот, удаление',
+  hSel:'рисование выключено: касание берёт фигуру, второе открывает свойства',
+  hUndo:'отменять нечего', hNoPads:'поля выключены в этой сборке', hNoSize:'заданный размер выключен в этой сборке', hUndoGone:'правки вернулись вместе с файлом, шагов отмены к ним нет', hBlurOnly:'окном размытия может быть только замкнутая фигура', hPickOne:'сперва выберите предмет, потом поднимайте', hBack:'работа восстановлена с прошлого раза', hLost:'снимок не сохранился: разметку восстановить нечем', hBig:'PNG на полном кадре весит десятки мегабайт',
+  hPdf:'страниц в документе: ',
+  hReset:'настройки сброшены',
+  hLimit:'предел: 12000 точек по стороне и 40 мегапикселей — принято ',
+  hIns:'тяните, чтобы двигать; красное кольцо меняет размер',
+  hPads:'тяните красную точку от края — появится поле'
+};
+
+L.fi = {
+  gFTwin:'kaksois', gFCorn:'kulmat', gFBevel:'viiste', gFDash:'katkoviiva',
+
+  hist:'historia',
+
+  gFrames:'kehykset', fEdge:'reuna',
+
+  gFLine:'viiva', gFMat:'paspartuu', gFShade:'varjo', gFNeg:'negatiivi',
+
+  camKept:'alkuperäinen tallennettu',
+
+  camEdit:'muokkaimeen', camPut:'liitä', camStk:'pakkaan',
+
+  hNoShell:'kamera toimii vain sovelluksessa',
+
+  cam:'kamera',
+
+  cutTool:'montaasi',
+
+  gWhole:'koko arkki', gFrameOnly:'vain kuva',
+
+  rndTo:'suotimet',
+
+  gRnd:'satunnainen', rndNext:'seuraava', rndPrev:'takaisin',
+
+  gAfr:'afrikka', gHel:'Helsinki', gDist:'etäisyys',
+
+  tiltVert:'pystysuora', tiltHorz:'vaakasuora',
+
+  vWait:'luen tiedostoa…',
+  vOk:'valmis: %p, %s. PDF koottu ilman uudelleenpakkausta.',
+  vTiny:'TIFF PDF:ksi purkamatta: pakattu virta siirtyy sellaisenaan.',
+  vSave:'tallenna',
+  vShare:'jaa',
+  vOpen:'valitse tiedosto',
+  vJot:'avaa Jotissa',
+  vSaved:'tallennettu: Download/Jot',
+  vNone:'avaa TIFF tai jaa se Jot TIFF:lle',
+  vNotTiff:'ei ole TIFF',
+  vTiled:'laatoitettua TIFFiä ei tueta',
+  vPlanar:'erillisiä kanavia ei tueta',
+  vChannels:'kanavamäärää ei tueta',
+  vDepth:'bittisyvyyttä ei tueta',
+  vCompression:'pakkausta ei tueta',
+  vPredictor:'ennustinta ei tueta',
+  vBroken:'tiedosto on rikki',
+  vFail:'ei onnistunut: ',
+  vKb:'kt',
+
+  desk:'pöytä',
+  lines:'viivat', shapes:'muodot',
+  accent:'korostus', help:'miten toimii',
+  place:'lisäys', sticker:'tarra', rot:'kierto',
+  insert:'lisää kuva',
+  legend:'merkit', icons:'icons only', home:'koti', pads:'marginaalit',
+  size:'koko', keepProp:'mittasuhteet', mPad:'kehykset', mNone:'nollaa',
+  hue:'sävy', sat:'kylläisyys', val:'kirkkaus', pick:'valitse',
+  own:'oma väri',
+  above:'päällä',
+  draw:'piirto', brush:'sivellin', eraser:'pyyhin', line:'viiva', rect:'suorakulmio', oval:'soikio', width:'paksuus', dash:'katkoviiva', fillIn:'täytetty',
+  caps:'teksti', back:'koti', more:'lisää', frame:'kuva',
+  adjust:'säätö', aBr:'kirkkaus', aCo:'kontrasti', aSa:'kylläisyys', aTe:'lämpötila', aGa:'gamma', aSh:'terävyys', aBl:'sumennus', aGr:'rakeisuus', aVi:'vinjetti', peek:'vertaa', aReset:'nollaa', hSlow:'terävyys ja sumennus hidastavat tallennusta',
+  menu:'valikko', open:'avaa', undo:'kumoa', rotate:'käännä', save:'tallenna', share:'jaa',
+  whole:'koko kuva', reboot:'käynnistä uudelleen',
+  view:'katso', edit:'muokkaa', bubble:'kupla', plate:'laatta', text:'teksti', arrow:'nuoli',
+  crop:'rajaa', done:'valmis', del:'poista', size:'koko', caption:'teksti',
+  opacity:'läpinäkyvyys', round:'pyöristys', free:'vapaa', orig:'alkuperäinen', apply:'rajaa',
+  lang:'kieli', qual:'tallennus', about:'tietoja', close:'sulje',
+  name:'tiedoston nimi', saveHere:'kansioon {dir}', saveAs:'kansioon',
+  page:'sivu', shape:'muoto', tilt:'kallistus',
+  bgColor:'väri', vert:'pysty', horz:'vaaka', shRect:'suorakulmio', shRound:'pyöristetty',
+  shOval:'ympyrä', theme:'ulkoasu', reset:'palauta asetukset', links:'linkit',
+  settings:'asetukset', thBlack:'musta', thNight:'keskiyö', thPine:'havu',thJot:'Jot', thGrey:'harmaa 18%',
+  thWarm:'lämmin', thLight:'vaalea',
+  q92:'JPEG 92', q100:'JPEG 100', qpng:'PNG', qpdf:'PDF',
+  hTap:'aseta ensin, tähtää häntä — näppäimistö tulee kosketuksesta',
+  hArrow:'keltainen rengas on kärki, punainen paksuus',
+  hCrop:'vedä kulmista; ympyrä vaatii suhteen 1:1',
+  hView:'kahdella sormella lähemmäs, kosketus poistuu',
+  hSaved:'tallennettu', hNoImg:'avaa ensin kuva', hPick:'valitse tiedosto',
+  hFail:'tiedostoa ei voitu avata', hMem:'muisti ei riittänyt täyteen kokoon', hDead:'arkkia ei voitu koota, tiedostoa ei kirjoitettu', hThin:'arkki jäi tyhjäksi siellä, missä kuvan pitäisi olla — tarkista tiedosto', hThinBig:'arkki jäi tyhjäksi siellä, missä kuvan pitäisi olla; koko on lähellä rajaa — kokeile pienempää',
+  hUndo:'ei mitään kumottavaa', hNoPads:'marginaalit on poistettu käytöstä tässä versiossa', hNoSize:'määritetty koko on poistettu käytöstä tässä versiossa', hUndoGone:'muokkaukset palasivat tiedoston mukana, niihin ei ole kumoamisaskelia', hBlurOnly:'vain suljettu muoto voi olla sumennusikkuna', hPickOne:'valitse ensin elementti, sitten nosta se', hBack:'työ palautettu viime kerralta', hLost:'kuvaa ei säilytetty: merkintöjä ei voitu palauttaa', hBig:'PNG täydessä koossa vie kymmeniä megatavuja',
+  hPdf:'sivuja asiakirjassa: ',
+  hReset:'asetukset palautettu',
+  hLimit:'raja: 12000 pikseliä sivulla ja 40 megapikseliä — käytetty ',
+  hIns:'vedä siirtääksesi, punainen rengas muuttaa kokoa',
+  hPads:'vedä punaista pistettä reunasta — saat marginaalin'
+};
+
+L.sv = {
+
+  vWait:'läser filen…',
+  vOk:'klart: %p, %s. PDF byggd utan omkodning.',
+  vTiny:'TIFF till PDF utan uppackning: den komprimerade strömmen förs över som den är.',
+  vSave:'spara',
+  vShare:'dela',
+  vOpen:'välj fil',
+  vJot:'öppna i Jot',
+  vSaved:'sparad i Download/Jot',
+  vNone:'öppna en TIFF eller dela den med Jot TIFF',
+  vNotTiff:'inte en TIFF',
+  vTiled:'rutindelad TIFF stöds inte',
+  vPlanar:'separata kanaler stöds inte',
+  vChannels:'det antalet kanaler stöds inte',
+  vDepth:'det bitdjupet stöds inte',
+  vCompression:'den komprimeringen stöds inte',
+  vPredictor:'den prediktorn stöds inte',
+  vBroken:'filen är skadad',
+  vFail:'misslyckades: ',
+  vKb:'kB',
+
+  desk:'bord',
+  lines:'linjer', shapes:'former',
+  accent:'accent', help:'så fungerar det',
+  place:'placera', sticker:'dekal', rot:'rotation',
+  insert:'infoga', pads:'marginaler',
+  size:'storlek', keepProp:'proportioner', mPad:'ramar', mNone:'nollställ',
+  hue:'nyans', sat:'mättnad', val:'ljusstyrka', pick:'välj',
+  own:'egen färg',
+  above:'överst',
+  draw:'rita', brush:'pensel', eraser:'suddgummi', line:'linje', rect:'rektangel', oval:'oval', width:'tjocklek', dash:'streckad', fillIn:'fylld',
+  caps:'texter', back:'hem', more:'mer', frame:'bild',
+  adjust:'justera', aBr:'ljusstyrka', aCo:'kontrast', aSa:'mättnad', aTe:'temperatur', aGa:'gamma', aSh:'skärpa', aBl:'oskärpa', aGr:'korn', aVi:'vinjett', peek:'jämför', aReset:'reset',
+  menu:'meny', open:'öppna', undo:'ångra', rotate:'rotera', save:'spara', share:'dela',
+  whole:'hela bilden', reboot:'starta om',
+  view:'visa', edit:'ändra', bubble:'pratbubbla', plate:'etikett', text:'text', arrow:'pil',
+  crop:'beskär', done:'klar', del:'ta bort', size:'storlek', caption:'text',
+  opacity:'genomskinlighet', round:'rundning', free:'fritt', orig:'original', apply:'beskär',
+  lang:'språk', qual:'sparande', about:'om', close:'stäng',
+  name:'filnamn', saveHere:'till {dir}', saveAs:'till mapp', page:'sida',
+  shape:'form', tilt:'lutning', bgColor:'färg',
+  vert:'stående', horz:'liggande', shRect:'rektangel', shRound:'rundad', shOval:'cirkel',
+  theme:'utseende', reset:'återställ', links:'länkar', settings:'inställningar',
+  thBlack:'svart', thNight:'midnatt', thPine:'barr',thJot:'Jot', thGrey:'grå 18%', thWarm:'varm', thLight:'ljus',
+  hCrop:'dra i hörnen; en cirkel kräver 1:1', hSaved:'sparad', hNoImg:'öppna en bild först',
+  hPick:'välj en fil', hFail:'kunde inte öppna filen', hUndo:'inget att ångra', hDead:'arket kunde inte byggas, ingen fil skrevs', hThin:'arket blev tomt där fotot borde vara — kontrollera filen', hThinBig:'arket blev tomt där fotot borde vara; storleken är nära gränsen — prova mindre', hNoPads:'marginaler är avstängda i den här versionen', hNoSize:'angiven storlek är avstängd i den här versionen', hUndoGone:'ändringarna kom tillbaka med filen; det finns inga ångra-steg till dem', hBlurOnly:'endast en sluten form kan vara ett suddfönster', hPickOne:'välj först ett element, lyft det sedan', hBack:'arbetet återställt från förra gången', hLost:'bilden sparades inte: markeringarna kunde inte återställas'
+};
+
+L.de = {
+
+  vWait:'lese Datei…',
+  vOk:'fertig: %p, %s. PDF ohne Neukodierung erstellt.',
+  vTiny:'TIFF zu PDF ohne Entpacken: der komprimierte Datenstrom wird unverändert übernommen.',
+  vSave:'speichern',
+  vShare:'teilen',
+  vOpen:'Datei wählen',
+  vJot:'in Jot öffnen',
+  vSaved:'in Download/Jot gespeichert',
+  vNone:'eine TIFF öffnen oder mit Jot TIFF teilen',
+  vNotTiff:'keine TIFF',
+  vTiled:'gekachelte TIFF wird nicht unterstützt',
+  vPlanar:'getrennte Kanäle werden nicht unterstützt',
+  vChannels:'diese Kanalzahl wird nicht unterstützt',
+  vDepth:'diese Bittiefe wird nicht unterstützt',
+  vCompression:'diese Kompression wird nicht unterstützt',
+  vPredictor:'dieser Prädiktor wird nicht unterstützt',
+  vBroken:'Datei ist beschädigt',
+  vFail:'fehlgeschlagen: ',
+  vKb:'KB',
+
+  desk:'Unterlage',
+  lines:'Linien', shapes:'Formen',
+  accent:'Akzent', help:'wie es geht',
+  place:'Einfügen', sticker:'Sticker', rot:'Drehung',
+  insert:'einfügen', pads:'Ränder',
+  size:'Größe', keepProp:'Proportionen', mPad:'Rahmen', mNone:'zurück',
+  hue:'Farbton', sat:'Sättigung', val:'Helligkeit', pick:'wählen',
+  own:'eigene Farbe',
+  above:'oben',
+  draw:'Zeichnen', brush:'Pinsel', eraser:'Radierer', line:'Linie', rect:'Rechteck', oval:'Oval', width:'Stärke', dash:'gestrichelt', fillIn:'gefüllt',
+  caps:'Texte', back:'Start', more:'mehr', frame:'Bild',
+  adjust:'Anpassen', aBr:'Helligkeit', aCo:'Kontrast', aSa:'Sättigung', aTe:'Temperatur', aGa:'Gamma', aSh:'Schärfe', aBl:'Unschärfe', aGr:'Korn', aVi:'Vignette', peek:'Vergleich', aReset:'reset',
+  menu:'Menü', open:'öffnen', undo:'rückgängig', rotate:'drehen', save:'speichern', share:'teilen',
+  whole:'ganzes Bild', reboot:'Neustart',
+  view:'ansehen', edit:'ändern', bubble:'Sprechblase', plate:'Schild', text:'Text', arrow:'Pfeil',
+  crop:'zuschneiden', done:'fertig', del:'löschen', size:'Größe', caption:'Beschriftung',
+  opacity:'Deckkraft', round:'Rundung', free:'frei', orig:'Original', apply:'zuschneiden',
+  lang:'Sprache', qual:'Speichern', about:'über', close:'schließen',
+  name:'Dateiname', saveHere:'nach {dir}', saveAs:'in Ordner', page:'Seite',
+  shape:'Form', bgColor:'Farbe',
+  vert:'hochkant', horz:'quer', shRect:'Rechteck', shRound:'gerundet', shOval:'Kreis',
+  theme:'Aussehen', reset:'zurücksetzen', links:'Links', settings:'Einstellungen',
+  thBlack:'schwarz', thNight:'Mitternacht', thPine:'Nadel',thJot:'Jot', thGrey:'grau 18%', thWarm:'warm', thLight:'hell',
+  hCrop:'Ecken ziehen; ein Kreis braucht 1:1', hSaved:'gespeichert',
+  hNoImg:'zuerst ein Bild öffnen', hPick:'Datei wählen', hFail:'Datei nicht lesbar',
+  hUndo:'nichts zum Zurücknehmen', hDead:'Das Blatt konnte nicht erstellt werden, es wurde nichts geschrieben', hThin:'Das Blatt blieb leer, wo das Foto sein sollte — prüfen Sie die Datei', hThinBig:'Das Blatt blieb leer, wo das Foto sein sollte; die Größe ist nahe am Limit — versuchen Sie es kleiner', hNoPads:'Ränder sind in dieser Version abgeschaltet', hNoSize:'Feste Größe ist in dieser Version abgeschaltet', hUndoGone:'Die Änderungen kamen mit der Datei zurück; es gibt keine Schritte dorthin', hBlurOnly:'nur eine geschlossene Form kann ein Unschärfefenster sein', hPickOne:'erst ein Element wählen, dann anheben', hBack:'Arbeit von letztem Mal wiederhergestellt', hLost:'Das Foto wurde nicht behalten: Markierungen nicht wiederherstellbar'
+};
+
+L.fr = {
+
+  vWait:'lecture du fichier…',
+  vOk:'terminé : %p, %s. PDF assemblé sans réencodage.',
+  vTiny:'TIFF en PDF sans décompression : le flux compressé est transféré tel quel.',
+  vSave:'enregistrer',
+  vShare:'partager',
+  vOpen:'choisir un fichier',
+  vJot:'ouvrir dans Jot',
+  vSaved:'enregistré dans Download/Jot',
+  vNone:'ouvrez un TIFF ou partagez-le avec Jot TIFF',
+  vNotTiff:'ce n’est pas un TIFF',
+  vTiled:'TIFF en tuiles non pris en charge',
+  vPlanar:'canaux séparés non pris en charge',
+  vChannels:'ce nombre de canaux n’est pas pris en charge',
+  vDepth:'cette profondeur n’est pas prise en charge',
+  vCompression:'cette compression n’est pas prise en charge',
+  vPredictor:'ce prédicteur n’est pas pris en charge',
+  vBroken:'fichier endommagé',
+  vFail:'échec : ',
+  vKb:'Ko',
+
+  desk:'fond',
+  lines:'lignes', shapes:'formes',
+  accent:'accent', help:'mode d\u2019emploi',
+  place:'placer', sticker:'sticker', rot:'rotation',
+  insert:'insérer', pads:'marges',
+  size:'taille', keepProp:'proportions', mPad:'marges', mNone:'annuler',
+  hue:'teinte', sat:'saturation', val:'luminosité', pick:'choisir',
+  own:'couleur',
+  above:'au-dessus',
+  draw:'dessin', brush:'pinceau', eraser:'gomme', line:'ligne', rect:'rectangle', oval:'ovale', width:'épaisseur', dash:'pointillé', fillIn:'rempli',
+  caps:'légendes', back:'accueil', more:'plus', frame:'image',
+  adjust:'réglages', aBr:'luminosité', aCo:'contraste', aSa:'saturation', aTe:'température', aGa:'gamma', aSh:'netteté', aBl:'flou', aGr:'grain', aVi:'vignetage', peek:'comparer', aReset:'neutre',
+  menu:'menu', open:'ouvrir', undo:'annuler', rotate:'pivoter', save:'enregistrer',
+  whole:'image entière', reboot:'redémarrer',
+  share:'partager', view:'voir', edit:'modifier', bubble:'bulle', plate:'étiquette',
+  text:'texte', arrow:'flèche', crop:'recadrer', done:'terminé', del:'supprimer',
+  size:'taille', caption:'légende', opacity:'opacité', round:'arrondi', free:'libre',
+  orig:'original', apply:'recadrer', lang:'langue', qual:'enregistrement',
+  about:'à propos', close:'fermer', name:'nom du fichier', saveHere:'vers {dir}',
+  saveAs:'vers dossier', page:'page', shape:'forme', bgColor:'couleur', vert:'vertical', horz:'horizontal',
+  shRect:'rectangle', shRound:'arrondi', shOval:'cercle', theme:'apparence',
+  reset:'réinitialiser', links:'liens', settings:'réglages', thBlack:'noir', thNight:'minuit', thPine:'sapin',thJot:'Jot',
+  thGrey:'gris 18%', thWarm:'chaud', thLight:'clair',
+  hCrop:'tirez les coins ; un cercle exige 1:1', hSaved:'enregistré',
+  hNoImg:"ouvrez d'abord une image", hPick:'choisissez un fichier',
+  hFail:'fichier illisible', hUndo:'rien à annuler', hDead:'la feuille n’a pas pu être construite, aucun fichier écrit', hThin:'la feuille est vide là où devrait être la photo — vérifiez le fichier', hThinBig:'la feuille est vide là où devrait être la photo ; la taille est proche de la limite — essayez plus petit', hNoPads:'les marges sont désactivées dans cette version', hNoSize:'la taille imposée est désactivée dans cette version', hUndoGone:'les retouches sont revenues avec le fichier ; aucune étape d’annulation ne mène à elles', hBlurOnly:'seule une forme fermée peut être une fenêtre de flou', hPickOne:'choisissez d’abord un élément, puis remontez-le', hBack:'travail restauré depuis la dernière fois', hLost:'photo non conservée : annotations irrécupérables'
+};
+
+L.es = {
+
+  vWait:'leyendo el archivo…',
+  vOk:'listo: %p, %s. PDF creado sin recodificar.',
+  vTiny:'TIFF a PDF sin descomprimir: el flujo comprimido se traslada tal cual.',
+  vSave:'guardar',
+  vShare:'compartir',
+  vOpen:'elegir archivo',
+  vJot:'abrir en Jot',
+  vSaved:'guardado en Download/Jot',
+  vNone:'abre un TIFF o compártelo con Jot TIFF',
+  vNotTiff:'no es un TIFF',
+  vTiled:'TIFF en mosaico no admitido',
+  vPlanar:'canales separados no admitidos',
+  vChannels:'ese número de canales no está admitido',
+  vDepth:'esa profundidad de bits no está admitida',
+  vCompression:'esa compresión no está admitida',
+  vPredictor:'ese predictor no está admitido',
+  vBroken:'archivo dañado',
+  vFail:'falló: ',
+  vKb:'KB',
+
+  desk:'fondo',
+  lines:'líneas', shapes:'formas',
+  accent:'acento', help:'cómo funciona',
+  place:'colocar', sticker:'pegatina', rot:'rotación',
+  insert:'insertar', pads:'márgenes',
+  size:'tamaño', keepProp:'proporciones', mPad:'márgenes', mNone:'restablecer',
+  hue:'tono', sat:'saturación', val:'brillo', pick:'elegir',
+  own:'color propio',
+  above:'encima',
+  draw:'dibujo', brush:'pincel', eraser:'goma', line:'línea', rect:'rectángulo', oval:'óvalo', width:'grosor', dash:'discontinua', fillIn:'relleno',
+  caps:'textos', back:'inicio', more:'más', frame:'imagen',
+  adjust:'ajustes', aBr:'brillo', aCo:'contraste', aSa:'saturación', aTe:'temperatura', aGa:'gamma', aSh:'nitidez', aBl:'desenfoque', aGr:'grano', aVi:'viñeta', peek:'comparar', aReset:'neutro',
+  menu:'menú', open:'abrir', undo:'deshacer', rotate:'girar', save:'guardar',
+  whole:'imagen completa', reboot:'reiniciar',
+  share:'compartir', view:'ver', edit:'editar', bubble:'globo', plate:'etiqueta',
+  text:'texto', arrow:'flecha', crop:'recortar', done:'listo', del:'borrar',
+  size:'tamaño', caption:'texto', opacity:'opacidad', round:'redondeo', free:'libre',
+  orig:'original', apply:'recortar', lang:'idioma', qual:'guardado',
+  about:'acerca de', close:'cerrar', name:'nombre del archivo', saveHere:'a {dir}',
+  saveAs:'a carpeta', page:'página', shape:'forma', bgColor:'color', vert:'vertical', horz:'horizontal',
+  shRect:'rectángulo', shRound:'redondeado', shOval:'círculo', theme:'apariencia',
+  reset:'restablecer', links:'enlaces', settings:'ajustes', thBlack:'negro', thNight:'medianoche', thPine:'pino',
+  thJot:'Jot', thGrey:'gris 18%', thWarm:'cálido', thLight:'claro',
+  hCrop:'arrastra las esquinas; un círculo exige 1:1', hSaved:'guardado',
+  hNoImg:'abre una imagen primero', hPick:'elige un archivo',
+  hFail:'no se pudo abrir', hUndo:'nada que deshacer', hDead:'no se pudo construir la hoja, no se escribió nada', hThin:'la hoja salió vacía donde debería estar la foto — revise el archivo', hThinBig:'la hoja salió vacía donde debería estar la foto; el tamaño está cerca del límite — pruebe menor', hNoPads:'los márgenes están desactivados en esta versión', hNoSize:'el tamaño fijado está desactivado en esta versión', hUndoGone:'los retoques volvieron con el archivo; no hay pasos de deshacer hasta ellos', hBlurOnly:'solo una forma cerrada puede ser una ventana de desenfoque', hPickOne:'elija primero un elemento y luego súbalo', hBack:'trabajo restaurado de la vez anterior', hLost:'la foto no se guardó: no se pueden restaurar las marcas'
+};
+
+L.uk = {
+
+  vWait:'читаю файл…',
+  vOk:'готово: %p, %s. PDF зібрано без перестиснення.',
+  vTiny:'TIFF у PDF без розпакування: стиснений потік переноситься як є.',
+  vSave:'зберегти',
+  vShare:'поділитися',
+  vOpen:'вибрати файл',
+  vJot:'відкрити в Jot',
+  vSaved:'збережено в Download/Jot',
+  vNone:'відкрийте файл TIFF або поділіться ним із Jot TIFF',
+  vNotTiff:'це не TIFF',
+  vTiled:'плитковий TIFF не підтримується',
+  vPlanar:'окремі канали не підтримуються',
+  vChannels:'така кількість каналів не підтримується',
+  vDepth:'така глибина не підтримується',
+  vCompression:'таке стиснення не підтримується',
+  vPredictor:'предиктор не підтримується',
+  vBroken:'файл пошкоджено',
+  vFail:'не вийшло: ',
+  vKb:'КБ',
+
+  desk:'стіл',
+  lines:'лінії', shapes:'фігури',
+  accent:'акцент', help:'як влаштовано',
+  place:'вставка', sticker:'стікер', rot:'поворот',
+  insert:'вставка', pads:'поля',
+  size:'розмір', keepProp:'пропорції', mPad:'поля', mNone:'скинути',
+  hue:'тон', sat:'насиченість', val:'яскравість', pick:'обрати',
+  own:'свій колір',
+  above:'зверху',
+  draw:'малювання', brush:'пензель', eraser:'гумка', line:'лінія', rect:'прямокутник', oval:'овал', width:'товщина', dash:'пунктир', fillIn:'заливка',
+  caps:'підписи', back:'домой', more:'ще', frame:'кадр',
+  adjust:'корекція', aBr:'яскравість', aCo:'контраст', aSa:'насиченість', aTe:'температура', aGa:'гама', aSh:'різкість', aBl:'розмиття', aGr:'зерно', aVi:'віньєтка', peek:'порівняти', aReset:'сброс',
+  menu:'меню', open:'відкрити', undo:'скасувати', rotate:'поворот', save:'зберегти',
+  whole:'усе зображення', reboot:'перезапуск',
+  share:'поділитися', view:'перегляд', edit:'правка', bubble:'хмарка', plate:'плашка',
+  text:'текст', arrow:'стрілка', crop:'обрізка', done:'готово', del:'видалити',
+  size:'розмір', caption:'підпис', opacity:'прозорість', round:'заокруглення',
+  free:'вільно', orig:'початкове', apply:'обрізати', lang:'мова',
+  qual:'збереження', about:'про програму', close:'закрити', name:'назва файлу',
+  saveHere:'у {dir}', saveAs:'у теку', page:'сторінка', shape:'форма', bgColor:'колір',
+  vert:'вертикально', horz:'горизонтально', shRect:'прямокутник', shRound:'заокруглений',
+  shOval:'коло', theme:'оформлення', reset:'скинути', links:'посилання',
+  settings:'налаштування', thBlack:'чорний', thNight:'опівніч', thPine:'хвоя',thJot:'Jot', thGrey:'сірий 18%',
+  thWarm:'теплий', thLight:'світлий',
+  hCrop:'тягніть кути; для кола потрібно 1:1', hSaved:'збережено',
+  hNoImg:'спершу відкрийте знімок', hPick:'оберіть файл',
+  hFail:'файл не відкрився', hUndo:'нічого скасовувати', hDead:'аркуш не зібрався, файл не записано', hThin:'аркуш вийшов порожнім там, де має бути знімок — перевірте файл', hThinBig:'аркуш вийшов порожнім там, де має бути знімок; розмір біля межі — спробуйте менший', hNoPads:'поля вимкнені в цій збірці', hNoSize:'заданий розмір вимкнений у цій збірці', hUndoGone:'правки повернулися разом із файлом, кроків скасування до них немає', hBlurOnly:'вікном розмиття може бути лише замкнена фігура', hPickOne:'спершу виберіть предмет, потім піднімайте', hBack:'роботу відновлено з минулого разу', hLost:'знімок не зберігся: розмітку відновити нічим'
+};
+
+L.ar = {
+
+  vWait:'جارٍ قراءة الملف…',
+  vOk:'تم: %p، %s. أُنشئ PDF دون إعادة ترميز.',
+  vTiny:'من TIFF إلى PDF دون فك الضغط: يُنقل التدفق المضغوط كما هو.',
+  vSave:'حفظ',
+  vShare:'مشاركة',
+  vOpen:'اختيار ملف',
+  vJot:'فتح في Jot',
+  vSaved:'حُفظ في Download/Jot',
+  vNone:'افتح ملف TIFF أو شاركه مع Jot TIFF',
+  vNotTiff:'ليس ملف TIFF',
+  vTiled:'TIFF المبلّط غير مدعوم',
+  vPlanar:'القنوات المنفصلة غير مدعومة',
+  vChannels:'عدد القنوات هذا غير مدعوم',
+  vDepth:'عمق البتات هذا غير مدعوم',
+  vCompression:'هذا الضغط غير مدعوم',
+  vPredictor:'هذا المتنبّئ غير مدعوم',
+  vBroken:'الملف تالف',
+  vFail:'فشل: ',
+  vKb:'ك.ب',
+
+  desk:'الخلفية',
+  lines:'خطوط', shapes:'أشكال',
+  accent:'لون مميز', help:'كيف يعمل',
+  place:'إضافة', sticker:'ملصق', rot:'دوران',
+  insert:'إدراج', pads:'هوامش',
+  size:'الحجم', keepProp:'النسب', mPad:'حواف', mNone:'إعادة',
+  hue:'درجة اللون', sat:'تشبع', val:'سطوع', pick:'اختر',
+  own:'لون خاص',
+  above:'فوق',
+  draw:'رسم', brush:'فرشاة', eraser:'ممحاة', line:'خط', rect:'مستطيل', oval:'بيضاوي', width:'سماكة', dash:'متقطع', fillIn:'ممتلئ',
+  caps:'التعليقات', back:'الرئيسية', more:'المزيد', frame:'الإطار',
+  adjust:'ضبط', aBr:'سطوع', aCo:'تباين', aSa:'تشبع', aTe:'حرارة', aGa:'غاما', aSh:'حدة', aBl:'ضباب', aGr:'حبيبات', aVi:'تظليل', peek:'مقارنة', aReset:'محايد',
+  menu:'القائمة', open:'فتح', undo:'تراجع', rotate:'تدوير', save:'حفظ', share:'مشاركة',
+  whole:'الصورة كاملة', reboot:'إعادة تشغيل',
+  view:'عرض', edit:'تحرير', bubble:'فقاعة', plate:'لوحة', text:'نص', arrow:'سهم',
+  crop:'قص', done:'تم', del:'حذف', size:'حجم', caption:'تعليق', opacity:'شفافية',
+  round:'استدارة', free:'حر', orig:'الأصل', apply:'قص', lang:'اللغة',
+  qual:'الحفظ', about:'حول', close:'إغلاق', name:'اسم الملف', saveHere:'إلى {dir}',
+  saveAs:'إلى مجلد', page:'صفحة', shape:'شكل', bgColor:'لون', vert:'عمودي', horz:'أفقي', shRect:'مستطيل',
+  shRound:'مستدير', shOval:'دائرة', theme:'المظهر', reset:'إعادة ضبط', links:'روابط',
+  settings:'الإعدادات', thBlack:'أسود', thNight:'منتصف الليل', thPine:'صنوبر',thJot:'Jot', thGrey:'رمادي 18%',
+  thWarm:'دافئ', thLight:'فاتح',
+  hSaved:'تم الحفظ', hNoImg:'افتح صورة أولاً', hPick:'اختر ملفاً', hUndo:'لا شيء للتراجع', hDead:'تعذّر بناء الورقة ولم يُكتب أي ملف', hThin:'خرجت الورقة فارغة حيث ينبغي أن تكون الصورة — تحقّق من الملف', hThinBig:'خرجت الورقة فارغة حيث ينبغي أن تكون الصورة؛ الحجم قرب الحد — جرّب حجماً أصغر', hNoPads:'الهوامش معطّلة في هذه النسخة', hNoSize:'الحجم المحدَّد معطّل في هذه النسخة', hUndoGone:'عادت التعديلات مع الملف، ولا توجد خطوات تراجع إليها', hBlurOnly:'نافذة التمويه تكون بشكل مغلق فقط', hPickOne:'اختر عنصرًا أولًا ثم ارفعه', hBack:'تمت استعادة العمل من المرة السابقة', hLost:'لم يتم حفظ الصورة: تعذّرت استعادة التعليقات'
+};
+
+L.he = {
+
+  vWait:'קורא את הקובץ…',
+  vOk:'מוכן: %p, %s. ה‑PDF נבנה ללא קידוד מחדש.',
+  vTiny:'מ‑TIFF ל‑PDF ללא פריקה: הזרם הדחוס מועבר כפי שהוא.',
+  vSave:'שמירה',
+  vShare:'שיתוף',
+  vOpen:'בחירת קובץ',
+  vJot:'פתיחה ב‑Jot',
+  vSaved:'נשמר ב‑Download/Jot',
+  vNone:'פתחו קובץ TIFF או שתפו אותו עם Jot TIFF',
+  vNotTiff:'זה לא TIFF',
+  vTiled:'TIFF מרוצף אינו נתמך',
+  vPlanar:'ערוצים נפרדים אינם נתמכים',
+  vChannels:'מספר ערוצים כזה אינו נתמך',
+  vDepth:'עומק סיביות כזה אינו נתמך',
+  vCompression:'דחיסה כזו אינה נתמכת',
+  vPredictor:'מנבא כזה אינו נתמך',
+  vBroken:'הקובץ פגום',
+  vFail:'נכשל: ',
+  vKb:'ק"ב',
+
+  desk:'רקע',
+  lines:'קווים', shapes:'צורות',
+  accent:'צבע הדגשה', help:'איך זה עובד',
+  place:'הוספה', sticker:'מדבקה', rot:'סיבוב',
+  insert:'הוספה', pads:'שוליים',
+  size:'גודל', keepProp:'יחס', mPad:'שוליים', mNone:'איפוס',
+  hue:'גוון', sat:'רוויה', val:'בהירות', pick:'בחר',
+  own:'צבע משלך',
+  above:'למעלה',
+  draw:'ציור', brush:'מכחול', eraser:'מחק', line:'קו', rect:'מלבן', oval:'אליפסה', width:'עובי', dash:'מקווקו', fillIn:'מלא',
+  caps:'כיתובים', back:'בית', more:'עוד', frame:'מסגרת',
+  adjust:'כוונון', aBr:'בהירות', aCo:'ניגודיות', aSa:'רוויה', aTe:'טמפרטורה', aGa:'גמא', aSh:'חדות', aBl:'טשטוש', aGr:'גרעין', aVi:'ויניה', peek:'השוואה', aReset:'ניטרלי',
+  menu:'תפריט', open:'פתיחה', undo:'ביטול', rotate:'סיבוב', save:'שמירה', share:'שיתוף',
+  whole:'כל התמונה', reboot:'הפעלה מחדש',
+  view:'תצוגה', edit:'עריכה', bubble:'בועה', plate:'תווית', text:'טקסט', arrow:'חץ',
+  crop:'חיתוך', done:'סיום', del:'מחיקה', size:'גודל', caption:'כיתוב', opacity:'שקיפות',
+  round:'עיגול', free:'חופשי', orig:'מקורי', apply:'חתוך', lang:'שפה',
+  qual:'שמירה', about:'אודות', close:'סגירה', name:'שם הקובץ', saveHere:'אל {dir}',
+  saveAs:'לתיקייה', page:'עמוד', shape:'צורה', bgColor:'צבע', vert:'לאורך', horz:'לרוחב', shRect:'מלבן',
+  shRound:'מעוגל', shOval:'עיגול', theme:'מראה', reset:'איפוס', links:'קישורים',
+  settings:'הגדרות', thBlack:'שחור', thNight:'חצות', thPine:'אורן',thJot:'Jot', thGrey:'אפור 18%',
+  thWarm:'חמים', thLight:'בהיר',
+  hSaved:'נשמר', hNoImg:'פתח תחילה תמונה', hPick:'בחר קובץ', hUndo:'אין מה לבטל', hDead:'לא ניתן היה לבנות את הגיליון ולא נכתב קובץ', hThin:'הגיליון יצא ריק היכן שאמורה להיות התמונה — בדוק את הקובץ', hThinBig:'הגיליון יצא ריק היכן שאמורה להיות התמונה; הגודל קרוב לגבול — נסה קטן יותר', hNoPads:'השוליים מושבתים בגרסה זו', hNoSize:'גודל קבוע מושבת בגרסה זו', hUndoGone:'העריכות חזרו עם הקובץ; אין אליהן צעדי ביטול', hBlurOnly:'רק צורה סגורה יכולה לשמש חלון טשטוש', hPickOne:'בחר תחילה פריט ואז הרם אותו', hBack:'העבודה שוחזרה מהפעם הקודמת', hLost:'התמונה לא נשמרה: אין ממה לשחזר את הסימונים'
+};
+
+L.zh = {
+
+  vWait:'正在读取文件…',
+  vOk:'完成：%p，%s。PDF 未经重新编码即生成。',
+  vTiny:'TIFF 转 PDF 无需解包：压缩流原样转移。',
+  vSave:'保存',
+  vShare:'分享',
+  vOpen:'选择文件',
+  vJot:'在 Jot 中打开',
+  vSaved:'已保存到 Download/Jot',
+  vNone:'打开 TIFF 文件，或将其分享给 Jot TIFF',
+  vNotTiff:'这不是 TIFF',
+  vTiled:'不支持分块 TIFF',
+  vPlanar:'不支持分离通道',
+  vChannels:'不支持该通道数',
+  vDepth:'不支持该位深',
+  vCompression:'不支持该压缩方式',
+  vPredictor:'不支持该预测器',
+  vBroken:'文件已损坏',
+  vFail:'失败：',
+  vKb:'KB',
+
+  desk:'衬底',
+  lines:'线条', shapes:'形状',
+  accent:'强调色', help:'使用说明',
+  place:'放置', sticker:'贴纸', rot:'旋转',
+  insert:'插入', pads:'留白',
+  size:'尺寸', keepProp:'比例', mPad:'留白', mNone:'重置',
+  hue:'色相', sat:'饱和度', val:'亮度', pick:'选择',
+  own:'自定颜色',
+  above:'置顶',
+  draw:'绘图', brush:'画笔', eraser:'橡皮', line:'直线', rect:'矩形', oval:'椭圆', width:'粗细', dash:'虚线', fillIn:'填充',
+  caps:'标注', back:'主页', more:'更多', frame:'画面',
+  adjust:'调整', aBr:'亮度', aCo:'对比度', aSa:'饱和度', aTe:'色温', aGa:'伽马', aSh:'锐度', aBl:'模糊', aGr:'颗粒', aVi:'暗角', peek:'对比', aReset:'中性',
+  menu:'菜单', open:'打开', undo:'撤销', rotate:'旋转', save:'保存', share:'分享',
+  whole:'完整图片', reboot:'restart',
+  view:'查看', edit:'编辑', bubble:'气泡', plate:'标签', text:'文字', arrow:'箭头',
+  crop:'裁剪', done:'完成', del:'删除', size:'大小', caption:'说明', opacity:'不透明度',
+  round:'圆角', free:'自由', orig:'原始', apply:'裁剪', lang:'语言',
+  qual:'保存格式', about:'关于', close:'关闭', name:'文件名', saveHere:'保存到 {dir}',
+  saveAs:'到文件夹', page:'页', shape:'形状', bgColor:'彩色', vert:'竖向', horz:'横向', shRect:'矩形',
+  shRound:'圆角', shOval:'圆形', theme:'外观', reset:'重置设置', links:'链接',
+  settings:'设置', thBlack:'纯黑', thNight:'午夜', thPine:'松林',thJot:'Jot', thGrey:'灰 18%', thWarm:'暖色', thLight:'浅色',
+  hSaved:'已保存', hNoImg:'请先打开图片', hPick:'选择文件', hUndo:'没有可撤销的操作', hDead:'无法生成图纸，未写入任何文件', hThin:'照片本该出现的位置是空白——请检查文件', hThinBig:'照片本该出现的位置是空白；尺寸接近上限——请尝试更小的尺寸', hNoPads:'此版本已关闭页边距', hNoSize:'此版本已关闭指定尺寸', hUndoGone:'修改随文件一同恢复，没有对应的撤销步骤', hBlurOnly:'只有闭合图形才能作为模糊窗口', hPickOne:'请先选择元素，再将其上移', hBack:'已恢复上次的工作', hLost:'照片未保留：无法恢复标注'
+};
+
+L.ur = {
+
+  vWait:'فائل پڑھ رہا ہوں…',
+  vOk:'ہو گیا: %p، %s۔ PDF دوبارہ انکوڈ کیے بغیر بنایا گیا۔',
+  vTiny:'TIFF سے PDF بغیر ان پیک کیے: دباؤ والا سلسلہ جوں کا توں منتقل ہوتا ہے۔',
+  vSave:'محفوظ کریں',
+  vShare:'شیئر کریں',
+  vOpen:'فائل منتخب کریں',
+  vJot:'Jot میں کھولیں',
+  vSaved:'Download/Jot میں محفوظ ہوا',
+  vNone:'TIFF فائل کھولیں یا Jot TIFF کے ساتھ شیئر کریں',
+  vNotTiff:'یہ TIFF نہیں ہے',
+  vTiled:'ٹائل شدہ TIFF کی معاونت نہیں',
+  vPlanar:'الگ چینلز کی معاونت نہیں',
+  vChannels:'اس چینل تعداد کی معاونت نہیں',
+  vDepth:'اس بٹ ڈیپتھ کی معاونت نہیں',
+  vCompression:'اس کمپریشن کی معاونت نہیں',
+  vPredictor:'اس پیشگو کی معاونت نہیں',
+  vBroken:'فائل خراب ہے',
+  vFail:'ناکام: ',
+  vKb:'کے بی',
+
+  desk:'پس منظر',
+  lines:'لکیریں', shapes:'شکلیں',
+  accent:'ایکسنٹ', help:'کیسے کام کرتا ہے',
+  place:'رکھیں', sticker:'اسٹیکر', rot:'گھماؤ',
+  insert:'داخل', pads:'حاشیے',
+  size:'سائز', keepProp:'تناسب', mPad:'حاشیے', mNone:'ری سیٹ',
+  hue:'رنگت', sat:'سیرابی', val:'روشنی', pick:'منتخب کریں',
+  own:'اپنا رنگ',
+  above:'اوپر',
+  draw:'ڈرائنگ', brush:'برش', eraser:'ربر', line:'لکیر', rect:'مستطیل', oval:'بیضوی', width:'موٹائی', dash:'ڈیش', fillIn:'بھرا',
+  caps:'عبارات', back:'ہوم', more:'مزید', frame:'فریم',
+  adjust:'ایڈجسٹ', aBr:'روشنی', aCo:'کنٹراسٹ', aSa:'سیرابی', aTe:'درجہ حرارت', aGa:'گاما', aSh:'تیزی', aBl:'دھندلا', aGr:'دانہ', aVi:'وگنیٹ', peek:'موازنہ', aReset:'غیر جانبدار',
+  menu:'مینو', open:'کھولیں', undo:'واپس لیں', rotate:'گھمائیں', save:'محفوظ', share:'شیئر',
+  whole:'پوری تصویر', reboot:'restart',
+  view:'دیکھیں', edit:'ترمیم', bubble:'ببل', plate:'لیبل', text:'متن', arrow:'تیر',
+  crop:'کاٹیں', done:'مکمل', del:'حذف', size:'سائز', caption:'عبارت', opacity:'شفافیت',
+  round:'گولائی', free:'آزاد', orig:'اصل', apply:'کاٹیں', lang:'زبان',
+  qual:'محفوظ کرنا', about:'تعارف', close:'بند', name:'فائل کا نام',
+  saveHere:'{dir} میں', saveAs:'فولڈر میں', page:'صفحہ', shape:'شکل', bgColor:'رنگ', vert:'عمودی',
+  horz:'افقی', shRect:'مستطیل', shRound:'گول', shOval:'دائرہ', theme:'ظاہری شکل',
+  reset:'ری سیٹ', links:'روابط', settings:'ترتیبات', thBlack:'سیاہ', thNight:'آدھی رات', thPine:'صنوبر',thJot:'Jot',
+  thGrey:'خاکستری 18%', thWarm:'گرم', thLight:'روشن',
+  hSaved:'محفوظ ہو گیا', hNoImg:'پہلے تصویر کھولیں', hPick:'فائل منتخب کریں'
+};
+
+L.ky = {
+
+  vWait:'файлды окуп жатам…',
+  vOk:'даяр: %p, %s. PDF кайра кысылбастан чогултулду.',
+  vTiny:'TIFF PDFке чечмей: кысылган агым ошол бойдон өткөрүлөт.',
+  vSave:'сактоо',
+  vShare:'бөлүшүү',
+  vOpen:'файл тандоо',
+  vJot:'Jot менен ачуу',
+  vSaved:'Download/Jot ичине сакталды',
+  vNone:'TIFF файлын ачыңыз же аны Jot TIFF менен бөлүшүңүз',
+  vNotTiff:'бул TIFF эмес',
+  vTiled:'плиткалуу TIFF колдоого алынбайт',
+  vPlanar:'өзүнчө каналдар колдоого алынбайт',
+  vChannels:'мындай канал саны колдоого алынбайт',
+  vDepth:'мындай терңдик колдоого алынбайт',
+  vCompression:'мындай кысуу колдоого алынбайт',
+  vPredictor:'мындай болжолдогуч колдоого алынбайт',
+  vBroken:'файл бузулган',
+  vFail:'болбоду: ',
+  vKb:'КБ',
+
+  desk:'фон',
+  lines:'сызыктар', shapes:'фигуралар',
+  accent:'басым түс', help:'кантип иштейт',
+  place:'коюу', sticker:'стикер', rot:'буруу',
+  insert:'киргизүү', pads:'талаа',
+  size:'өлчөм', keepProp:'катышы', mPad:'талаа', mNone:'баштапкы',
+  hue:'түс', sat:'каныктык', val:'жарыктык', pick:'тандоо',
+  own:'өз түсү',
+  above:'үстүнөн',
+  draw:'сүрөт тартуу', brush:'калем', eraser:'өчүргүч', line:'сызык', rect:'тик бурчтук', oval:'сүйрү', width:'калыңдык', dash:'пунктир', fillIn:'толтуруу',
+  caps:'жазуулар', back:'башкы', more:'дагы', frame:'кадр',
+  adjust:'оңдоо', aBr:'жарыктык', aCo:'карама-каршылык', aSa:'каныктык', aTe:'температура', aGa:'гамма', aSh:'курчтук', aBl:'бүдөмүк', aGr:'дан', aVi:'винъетка', peek:'салыштыруу', aReset:'нейтралдуу',
+  menu:'меню', open:'ачуу', undo:'жокко чыгаруу', rotate:'буруу', save:'сактоо',
+  whole:'толук сүрөт', reboot:'restart',
+  share:'бөлүшүү', view:'көрүү', edit:'оңдоо', bubble:'булут', plate:'такта',
+  text:'текст', arrow:'жебе', crop:'кесүү', done:'даяр', del:'өчүрүү', size:'өлчөм',
+  caption:'жазуу', opacity:'тунуктук', round:'тегеректөө', free:'эркин', orig:'башталгыч',
+  apply:'кесүү', lang:'тил', qual:'сактоо', about:'программа жөнүндө',
+  close:'жабуу', name:'файлдын аты', saveHere:'{dir} ичине', saveAs:'папкага',
+  page:'бет', shape:'форма', bgColor:'түс',
+  vert:'тик', horz:'жатык', shRect:'тик бурчтук', shRound:'тегеректелген', shOval:'тегерек',
+  theme:'көрүнүш', reset:'жөндөөлөрдү калыбына келтирүү', links:'шилтемелер',
+  settings:'жөндөөлөр', thBlack:'кара', thNight:'түн ортосу', thPine:'карагай',thJot:'Jot', thGrey:'боз 18%',
+  thWarm:'жылуу', thLight:'жарык',
+  hSaved:'сакталды', hNoImg:'адегенде сүрөт ачыңыз', hPick:'файл тандаңыз'
+};
+
+L.kk = {
+
+  vWait:'файлды оқып жатырмын…',
+  vOk:'дайын: %p, %s. PDF қайта қысусыз жиналды.',
+  vTiny:'TIFF PDF-ке тарқатпай: қысылған ағын сол күйінде көшіріледі.',
+  vSave:'сақтау',
+  vShare:'бөлісу',
+  vOpen:'файл таңдау',
+  vJot:'Jot-та ашу',
+  vSaved:'Download/Jot ішіне сақталды',
+  vNone:'TIFF файлын ашыңыз немесе оны Jot TIFF-пен бөлісіңіз',
+  vNotTiff:'бұл TIFF емес',
+  vTiled:'тақталы TIFF қолдау таппайды',
+  vPlanar:'бөлек арналар қолдау таппайды',
+  vChannels:'мұндай арна саны қолдау таппайды',
+  vDepth:'мұндай биттік тереңдік қолдау таппайды',
+  vCompression:'мұндай қысу қолдау таппайды',
+  vPredictor:'мұндай болжағыш қолдау таппайды',
+  vBroken:'файл бүлінген',
+  vFail:'болмады: ',
+  vKb:'КБ',
+
+  desk:'фон',
+  lines:'сызықтар', shapes:'пішіндер',
+  accent:'екпін түсі', help:'қалай жұмыс істейді',
+  place:'қою', sticker:'стикер', rot:'бұру',
+  insert:'кірістіру', pads:'жиек',
+  size:'өлшем', keepProp:'арақатынас', mPad:'жиек', mNone:'бастапқы',
+  hue:'реңк', sat:'қанықтық', val:'жарықтық', pick:'таңдау',
+  own:'өз түсі',
+  above:'үстінде',
+  draw:'сурет салу', brush:'қылқалам', eraser:'өшіргіш', line:'сызық', rect:'тіктөртбұрыш', oval:'сопақ', width:'қалыңдық', dash:'пунктир', fillIn:'толтыру',
+  caps:'жазулар', back:'басты', more:'тағы', frame:'кадр',
+  adjust:'түзету', aBr:'жарықтық', aCo:'контраст', aSa:'қанықтық', aTe:'температура', aGa:'гамма', aSh:'айқындық', aBl:'бұлдырлау', aGr:'дән', aVi:'винъетка', peek:'салыстыру', aReset:'бейтарап',
+  menu:'мәзір', open:'ашу', undo:'болдырмау', rotate:'бұру', save:'сақтау',
+  whole:'толық сурет', reboot:'restart',
+  share:'бөлісу', view:'қарау', edit:'өңдеу', bubble:'бұлт', plate:'тақтайша',
+  text:'мәтін', arrow:'көрсеткі', crop:'қиып алу', done:'дайын', del:'жою',
+  size:'өлшем', caption:'жазу', opacity:'мөлдірлік', round:'дөңгелету', free:'еркін',
+  orig:'бастапқы', apply:'қиып алу', lang:'тіл', qual:'сақтау',
+  about:'бағдарлама туралы', close:'жабу', name:'файл аты', saveHere:'{dir} ішіне',
+  saveAs:'қалтаға', page:'бет', shape:'пішін', bgColor:'түс', vert:'тік', horz:'көлденең', shRect:'тіктөртбұрыш',
+  shRound:'дөңгеленген', shOval:'шеңбер', theme:'көрініс', reset:'параметрлерді қалпына келтіру',
+  links:'сілтемелер', settings:'параметрлер', thBlack:'қара', thNight:'түн ортасы', thPine:'қарағай',thJot:'Jot',
+  thGrey:'сұр 18%', thWarm:'жылы', thLight:'ашық',
+  hSaved:'сақталды', hNoImg:'алдымен суретті ашыңыз', hPick:'файл таңдаңыз'
+};
+
+var A = {
+ru: {
+  aTitle:'Jot — аннотирование и обработка изображений',
+  aBody:'Компактный инструмент для точного нанесения выносок с указателями, текстовых плашек, графических элементов и кадрирования снимков.',
+  aFmt:'Чтение: JPEG, PNG, WebP, GIF, BMP, HEIC, PDF постранично. Экспорт: JPEG, PNG, PDF.',
+  aGest:'Перемещение элемента одним касанием, масштабирование кадра двумя. Положение указателя и размер выноски настраиваются цветными маркерами. При сворачивании приложения снимок остаётся в памяти.',
+  aTiff:'Модуль Jot TIFF. Конвертация отсканированных документов TIFF в PDF без предварительной распаковки и повторного сжатия. Поток данных переносится напрямую штатными фильтрами CCITT и LZW, поэтому исходное качество сохраняется полностью.',
+  aPriv:'Приватность. Ни одного запроса на системные разрешения: работа с файлами идёт через системный Intent и MediaStore. Нуль сетевых вызовов, рекламных модулей и трекеров аналитики.',
+  aMade:'Приложение целиком написано искусственным интеллектом: постановка задачи, архитектура, код, графика, сборка и подпись — Claude Opus 5. Оболочка реализована на базе WebView и собрана вручную через apktool, без Android Studio и Gradle.'
+},
+en: {
+  aTitle:'Jot — annotating and preparing images',
+  aBody:'A compact tool for placing balloons with pointers, text labels and graphic marks, and for cropping photographs.',
+  aFmt:'Reads JPEG, PNG, WebP, GIF, BMP, HEIC and PDF page by page. Exports JPEG, PNG, PDF.',
+  aGest:'One finger moves an element, two scale the frame. The pointer target and the caption size are set with coloured markers. Minimising the application leaves the photograph in memory.',
+  aTiff:'The Jot TIFF module converts scanned TIFF documents into PDF without unpacking or re-encoding. The data stream is carried across directly by the native CCITT and LZW filters, so the original quality is preserved entirely.',
+  aPriv:'Privacy. Not a single system permission is requested: files are handled through the system Intent and MediaStore. Zero network calls, advertising modules or analytics trackers.',
+  aMade:'The application was written entirely by artificial intelligence: brief, architecture, code, graphics, build and signing by Claude Opus 5. The shell is built on a WebView and assembled by hand with apktool, without Android Studio or Gradle.'
+},
+fi: {
+  aTitle:'Jot — kuvien merkintä ja käsittely',
+  aBody:'Pieni työkalu osoittavien puhekuplien, tekstilaattojen ja graafisten merkkien asetteluun sekä kuvien rajaukseen.',
+  aFmt:'Lukee: JPEG, PNG, WebP, GIF, BMP, HEIC ja PDF sivu kerrallaan. Tallentaa: JPEG, PNG, PDF.',
+  aGest:'Yksi sormi siirtää elementtiä, kaksi skaalaa kuvaa. Osoittimen kohde ja tekstin koko säädetään värillisistä merkeistä. Sovelluksen pienentäminen jättää kuvan muistiin.',
+  aTiff:'Jot TIFF -osa muuntaa skannatut TIFF-asiakirjat PDF:ksi purkamatta ja pakkaamatta uudelleen. Datavirta siirtyy suoraan PDF:n omilla CCITT- ja LZW-suodattimilla, joten alkuperäinen laatu säilyy täysin.',
+  aPriv:'Yksityisyys. Ei yhtään järjestelmän käyttöoikeuspyyntöä: tiedostot kulkevat Intentin ja MediaStoren kautta. Nolla verkkokutsua, mainosmoduulia tai analytiikkaa.',
+  aMade:'Sovellus on kokonaan tekoälyn kirjoittama: määrittely, arkkitehtuuri, koodi, grafiikka, käännös ja allekirjoitus Claude Opus 5. Kuori perustuu WebViewiin ja on koottu käsin apktoolilla, ilman Android Studiota ja Gradlea.'
+}
+};
+
+var FLAGS = [
+  ['auto','\uD83C\uDF10'], ['en','\uD83C\uDDEC\uD83C\uDDE7'], ['ru','\uD83C\uDDF7\uD83C\uDDFA'],
+  ['fi','\uD83C\uDDEB\uD83C\uDDEE'], ['sv','\uD83C\uDDF8\uD83C\uDDEA'], ['de','\uD83C\uDDE9\uD83C\uDDEA'],
+  ['fr','\uD83C\uDDEB\uD83C\uDDF7'], ['es','\uD83C\uDDEA\uD83C\uDDF8'], ['uk','\uD83C\uDDFA\uD83C\uDDE6'],
+  ['ar','\uD83C\uDDF8\uD83C\uDDE6'], ['he','\uD83C\uDDEE\uD83C\uDDF1'], ['zh','\uD83C\uDDE8\uD83C\uDDF3'],
+  ['ur','\uD83C\uDDF5\uD83C\uDDF0'], ['ky','\uD83C\uDDF0\uD83C\uDDEC'], ['kk','\uD83C\uDDF0\uD83C\uDDFF'],
+
+  ['icons','icons']
+];
+
+var RTL = {ar:1, he:1, ur:1};
+
+var THEMES = {
+  black: {bg:'#000000', bar:'rgba(24,24,27,.9)',  btn:'#26262b', btn2:'#3a3a42', ink:'#f2f2f4', dim:'#9a9aa2', desk:0},
+
+  jot:   {bg:'#1a1a1e', bar:'rgba(34,34,40,.92)', btn:'#2e2e34', btn2:'#43434c', ink:'#f0f0f2', dim:'#9c9ca4', desk:1, acc:'amber'},
+  grey:  {bg:'#2e2e2e', bar:'rgba(60,60,60,.94)', btn:'#4b4b4b', btn2:'#5e5e5e', ink:'#f6f6f6', dim:'#c2c2c2', desk:18},
+  warm:  {bg:'#1b1512', bar:'rgba(45,35,28,.94)', btn:'#3b2e24', btn2:'#4f3d2f', ink:'#f2e7d6', dim:'#b09a80', desk:9},
+  light: {bg:'#e6e6ea', bar:'rgba(250,250,252,.95)', btn:'#d8d8e0', btn2:'#c4c4ce', ink:'#17171a', dim:'#5c5c66', desk:90},
+
+  night: {bg:'#101318', bar:'rgba(25,29,36,.93)', btn:'#191d24', btn2:'#272d38', ink:'#eceef2', dim:'#98a0ae', desk:1, acc:'sky'},
+  pine:  {bg:'#121814', bar:'rgba(28,35,30,.93)', btn:'#1c231e', btn2:'#2a342d', ink:'#e9efea', dim:'#96a89b', desk:1, acc:'moss'}
+};
+
+var ACCENTS = {
+
+  amber:'#fdcd05',
+  red:'#e01b24', teal:'#006a6a',
+  purple:'#6750a4', berry:'#984061',
+
+  sky:'#8ab4f8', moss:'#81c995'
+};
+
+function deskOf(theme){
+  var t = THEMES[theme] || THEMES.black;
+  return (typeof t.desk === 'number') ? t.desk : 0;
+}
+
+function accOf(theme){
+  var t = THEMES[theme] || THEMES.black;
+  return t.acc || 'none';
+}
+
+var DEF = {lang:'en', fmt:'jpg92', theme:'jot', accent:'none', prefix:'jot', fb:'snd', hv:'once', lite:0};
+
+var cfg = {lang:'en', fmt:'jpg92', theme:'jot', accent:'amber', prefix:'jot', fb:'snd', hv:'once', lite:0, desk:1, name:'', stkSeed:0, dbg:0};
+
+function iconsOnly(){ return cfg.lang === 'icons'; }
+
+function langNow(){
+
+  if (cfg.lang !== 'auto') return L[cfg.lang] ? cfg.lang : 'en';
+  var n = 'en';
+  try { n = (navigator.language || 'en').slice(0,2).toLowerCase(); }
+  catch(e){  }
+  return L[n] ? n : 'en';
+}
+
+function T(k){
+  var d = L[langNow()] || L.en;
+  if (d[k] !== undefined) return d[k];
+  if (L.en[k] !== undefined) return L.en[k];
+  return (L.ru[k] !== undefined) ? L.ru[k] : k;
+}
+
+function TA(k){
+  var d = A[langNow()] || A.en;
+  return (d[k] !== undefined) ? d[k] : A.en[k];
+}
+
+function loadCfg(){
+  cfg.desk = deskOf(cfg.theme);
+  try {
+    var s = localStorage.getItem('jot.cfg');
+    if (!s) return;
+    var o = JSON.parse(s);
+    if (o && (o.lang === 'auto' || L[o.lang])) cfg.lang = o.lang;
+    if (o && o.fmt) cfg.fmt = o.fmt;
+
+    if (o && o.theme === 'coal') o.theme = 'jot';
+    if (o && THEMES[o.theme]) cfg.theme = o.theme;
+
+    if (o && o.accent === 'blue') o.accent = 'teal';
+    if (o && (o.accent === 'none' || ACCENTS[o.accent])) cfg.accent = o.accent;
+    if (o && (o.fb === 'off' || o.fb === 'snd')) cfg.fb = o.fb;
+    if (o && (o.hv === 'once' || o.hv === 'always')) cfg.hv = o.hv;
+    if (o && (o.lite === 0 || o.lite === 1)) cfg.lite = o.lite;
+    if (o && o.saidCopy) cfg.saidCopy = 1;
+    if (o && o.prefix) cfg.prefix = o.prefix;
+    if (o && o.duoDark) cfg.duoDark = o.duoDark;
+    if (o && o.duoLite) cfg.duoLite = o.duoLite;
+
+    cfg.desk = deskOf(cfg.theme);
+    if (o && typeof o.desk === 'number' && o.desk >= 0 && o.desk <= 100)
+      cfg.desk = Math.round(o.desk);
+  } catch(e){
+
+    errOnce('cfgRead', 'настройки не прочитались: ' + (e && e.message ? e.message : e));
+  }
+}
+
+function saveCfg(){
+  try {
+    localStorage.setItem('jot.cfg', JSON.stringify({lang:cfg.lang, fmt:cfg.fmt, theme:cfg.theme, accent:cfg.accent, prefix:cfg.prefix, fb:cfg.fb, lite:cfg.lite, desk:cfg.desk, stkSeed:cfg.stkSeed, hv:cfg.hv, saidCopy:cfg.saidCopy, duoDark:cfg.duoDark, duoLite:cfg.duoLite, dbg:cfg.dbg}));
+  } catch(e){
+
+    errOnce('cfgWrite', 'настройки не сохранились: ' + (e && e.message ? e.message : e));
+  }
+}
+
+function resetCfg(){
+  try { localStorage.removeItem('jot.cfg'); }
+  catch(e){
+
+    errOnce('cfgWipe', 'сброс настроек не дошёл до хранилища: ' + (e && e.message ? e.message : e));
+  }
+  cfg.lang = DEF.lang; cfg.fmt = DEF.fmt; cfg.theme = DEF.theme;
+  cfg.prefix = DEF.prefix; cfg.fb = DEF.fb; cfg.lite = DEF.lite;
+  cfg.desk = deskOf(cfg.theme);
+  cfg.accent = accOf(cfg.theme);
+}
+
+function srcBase(){
+  var n = '';
+  try { if (typeof BR !== 'undefined' && BR && BR.srcName) n = BR.srcName() || ''; }
+  catch(e){  }
+  n = String(n).replace(/\.[^.]*$/, '');
+  n = n.replace(/_\d{2}-\d{2}-\d{4}_\d{2}-\d{2}-\d{2}$/, '');
+  n = n.replace(/[\\\/:*?"<>|\n\r\t]/g, '').trim();
+  return n.slice(0, 60);
+}
+
+function stamp(base){
+  var d = new Date();
+  var p = function(n){ return (n < 10 ? '0' : '') + n; };
+  var day = p(d.getDate()) + '-' + p(d.getMonth()+1) + '-' + d.getFullYear();
+  var time = p(d.getHours()) + '-' + p(d.getMinutes()) + '-' + p(d.getSeconds());
+  return ((base && base.length) ? base : (cfg.prefix || 'jot')) + '_' + day + '_' + time;
+}
+
+function keepPrefix(name){
+  var s = String(name || '').split('_')[0].trim();
+  if (s.length && s.length < 40 && s !== cfg.prefix){
+    cfg.prefix = s;
+    saveCfg();
+  }
+}
+
+var REF = {
+  title: 'Jot — reference',
+  intro: 'A light editor for photographs and scans: captions with a tail, freehand marks, crop, colour correction, export to JPEG, PNG and PDF. Plus Jot TIFF, a separate converter for scanned documents. No permissions are requested and no network call is ever made.',
+  screens: [
+    ['Home', 'Three rows of four, and they are ordered by what they touch. The light row comes first: fix, zoom, a cell kept for a light tool not yet built, and geometry. These do not open a panel at all — the row turns into a track in place, the sheet is not refitted, and the picture stays where your eye left it. Then what you do to the whole picture: adjust, draw, text, filter. Then what you do to a part of it: insert, cut out, crop, sheet. Sheet is where the backdrop, spin, mirror, tilt and the exported size live, five rows of them. Margins are switched off from the third of September and stay off: drawing paper around a picture is not part of editing it any more. The house in the top row returns to the editor from any screen, closing everything that is open. The Jot sign in the corner does one thing: it opens the settings. Help lives there too from the third of September, a cell in the row under the accent colours together with reset, restart and voice — everything the hand reaches for; the row below it belongs to the taking-apart instead. A light tool taken renames its own cell: while it is open the cell says more, because more is both the way back to the home screen and the word for done, and the name of a tool tells you nothing while that tool is already in your hands. It is the same first cell that every panel carries, only arrived at from the other side. The last row carries a camera cell from the second of September, in the place the insert screen left empty. It works from the third of September. No file provider was needed after all: the address is handed out in advance through the picture store — a row goes into the shared table of images, the address comes back, and the camera is given it as the place to write. The cell opens a screen with three cameras rather than the camera itself: to the editor, insert, to the pack. Each of them opens the camera knowing where the shot is going, so the choice is made before the shot rather than after it — you already know why you raised the phone, and a question asked afterwards is one you have answered with your feet. Whichever of the three you pick, the camera screen closes itself and the shot arrives on the screen it belongs to: insert opens montage, to the pack opens the pack, to the editor comes back to the picture. Until the third of September only the editor left that screen, and it left it by accident — the page reloads on that road and took the screen with it. An inserted shot arrives at the same size as one picked from the gallery, because both go through one door: forty parts in a hundred of the width of the frame, and the height follows the shape of what you inserted. Whichever of the three you pick, the original goes into the Jot folder first, byte for byte, and only then does the shot go where you sent it. It used to be only the editor that kept a copy; a rule that holds for all three is worth more than an exception, because a hand should not have to remember which cell looks after the photograph. Nor does a full original survive elsewhere on the other two roads: an inserted shot lives inside a sheet that is not its own, and one sent to the pack is squeezed to 512 points along its longer side. Nothing is transplanted and nothing is understood: date, camera, exposure, ISO, orientation and coordinates survive because the file is a copy rather than a rebuild. What you save after editing carries none of that, and rightly so — it is no longer that photograph. You end up with two: the original with everything, and the edited one without. Open the page in a browser rather than the app and the button says so instead of going quiet, because there is no shell there to take the shot. This is the first code in Jot that ships without the bench having read it: the bench reads the markup and the page code and does not run the shell at all. The last cell of the light row is history, added on the third of September, and with it the home screen is finished. It opens one notch to the left of the end, so the first thing you see is the step back rather than the picture you were already looking at, and the handle has room to travel both ways. The right end of the track is where the work stands as you left it; each notch further left is what the sheet was before one more edit. Leave the tool without having touched the handle and the work comes back to the end by itself, silently: opening a tool must not choose anything. Move the handle yourself and the choice is yours, so stopping to the left and walking away leaves it there. With nothing on the stack there is no step back to open at, and the tool opens at the end. Drag back and forth as much as you like — nothing is decided while you look. The moment you edit again, everything to the right of where you stopped leaves the stack, which is what makes it a way of choosing rather than a way of looking. Cutting happens at that first edit rather than when you let go of the track or leave the tool, because letting go is not a decision: you may still be looking, and you may well want to go off and see the whole picture before you make up your mind.'],
+    ['Caption', 'The button puts a caption on the picture and opens its screen at once — the editor is the screen. The keyboard does not come with it: it takes two thirds of a phone, and you have come to see where the caption landed. Touch the field and it arrives. Text, colour, size, opacity, rounding, rotation, delete, and new for another one. A caption can be a label, a plate or a balloon; a balloon has a tail that points at a spot. One button in the bottom row carries the kind it is now and leads round on each tap: label, plate, balloon, label again. There is no step back round the ring, only the next step. While the screen is open a caption is taken by a tap and dragged by a finger, and one carried past the edge of the sheet stays visible, dimmed, so it is plain that this part will not reach the file. A caption left without a single character is thrown away.\n\nThe main screen edits nothing at all: it shows the result and hands out the tool sets. Every kind of object is edited on the screen it was born on. The cell that opens this screen is called text with a plus, and wears the mark that belonged to a light tool of that name until the first of September. That tool never did anything: it stood beside this one promising a second way to put letters on a picture, and two cells about letters, one of them empty, were worse than one cell carrying the better name. The place it held is still in the light row, unnamed and dashed, and it says so when touched. A new caption, label or mark appears a little below the middle of what you can see and a little to the left of it, so that its tail runs up and to the right, where the thing you are pointing at usually is. Until the third of September it appeared at the very bottom edge instead: the place was taken from the middle of the screen rather than the middle of the picture, and a landscape photograph on an upright phone leaves the middle of the screen below the picture entirely.'],
+    ['Drawing', 'Twelve tools folded into four buttons: eraser, freehand brush, marker and shapes. Select moved down to the bottom row, beside more and the bin: it is not a tool but a way of holding your hand. The screen opens with it, not with a brush: nothing is armed when you arrive, so you can set the picture up without laying a stray line on it. Take a tool and it draws; leave and come back and nothing is armed again, though the tool you had is remembered and comes back with one tap. One colour sits in the row above it: tap it, then tap the colour on the photograph that should stay, and everything else goes grey; the tolerance slider appears with it. The button stays lit while a colour is held, and tapping it again gives the picture back. While it is holding your hand nothing else on the screen draws, however long you keep a finger down: the selection follows the finger the way the eyedropper does, with the same window under the crosshair showing where the colour is being taken from. One drag is one step back. It lets go when you tap the lit button again or take another tool, and the line telling you what to do lives exactly as long as the waiting does. Paint and captions live above the photograph and survive it untouched. Reveal is a tool like the others: take it and the picture goes grey at once, then draw over what matters and the colour comes back exactly where you passed; the eraser closes it again. Taking the brush or the marker puts it down, the way they put each other down, and so does leaving the drawing panel: the grey is a preview and does not outlive the screen it belongs to, while the strokes themselves stay and undo like everything else. Undo with nothing left to undo puts the tool down too, so the colour always has a way back. Its brush is three times the usual width, because colour is brought back in broad sweeps rather than outlines. Opacity works as you would expect — a half-strength stroke brings the colour half way. Arrows, outlines and captions are drawn over the top and stay in full colour, which is the whole point: on a photograph of a junction box the wire you mean is rarely the only red thing in the frame. One colour, which used to sit in that cell and picked the surviving colour by similarity rather than by hand, is switched off for now; it will come back when it has a place of its own. Shapes sit under one button that cycles. The button wears the shape it will draw, so the first tap simply takes it; each further tap moves to the next one, and the drawing on the button changes with it. The order is the order of taps: arrow, circle, rectangle, triangle, straight line, arc. Arrow comes first because it is what marking up a photograph needs most often. There is no step back around the ring, only a next step, so the far shapes cost a few taps; the whole list is written here for that reason, since a button can only ever show one of them at a time. The button remembers the last shape you drew with, so leaving for the brush and coming back costs one tap rather than five. To put it down, take another tool or the select button: tapping this one moves the ring instead. A long press was considered and refused: pressing and holding already means two other things here, immersion on the canvas and the guide on the Jot mark, and one sign must not carry three meanings. The marker is a button among the tools rather than a switch beside them: by mechanism it is the same brush laid down differently, but a hand says take the marker, not take the brush and change how it lies. An arc with fill closes itself into a half circle. A chosen shape is solid to the finger across its whole area, whether filled or not: two yellow corner rings resize it and a third cream ring, marked with four arrows, drags the whole thing anywhere on the sheet and a little beyond, whatever tool is in hand. The row of colour holds four: white, black, the wheel and the eyedropper. Yellow and red left the row when it became four — the wheel still has them, at the cost of a second tap. Work made before that keeps its colours exactly: a colour is stored as a number, and the numbers did not move. A fill uses the whole opacity you set, so a hundred means opaque and the outline is no denser than the middle; for a shape you can see through, move the slider and read the number you get. A filled or blurred shape may have its outline taken down to nothing: the body holds the form, and the finger still catches the shape whether an outline is drawn or not. An empty outline keeps a minimum, because at nothing it would vanish from sight while staying in the document, with neither body nor line left to find it by; take the fill away from a shape whose outline was nothing and the outline comes back to that minimum by itself. The circle holds its proportion at every corner, not only while you first draw it: pulling either ring grows a circle and never an ellipse, and the oval standing beside it is the tool for an ellipse. The two rings do the same thing as each other, so there is nothing to remember; the middle of a chosen shape drags it too, but the ring is there so that nothing has to be guessed; line thickness lives on its own slider, where the number is visible and the shape does not jump. A shape that is not chosen is still caught by what is drawn, which is what lets you draw inside an empty circle and keeps a large rectangle from swallowing everything beneath it. Weight, colour, opacity and softness are previewed by the dot. The eyedropper answers one question: what colour is the base of the sheet under your finger. Inside the frame that is a pixel of the source file if there is one there: the sheet is layered, so under an empty pixel of a transparent PNG lies the paper, and a half transparent one is answered by the mixture you actually see.  Beyond the sheet, in a hole cut out, or where nothing is left and no paper was chosen there is no base at all and nothing is taken — the eyedropper stays lit and waits. It carries a loupe showing that same base rather than the screen, so the pixels under the crosshair are the real ones and a refusal is visible instead of silent. Paint and captions laid on top are not the base and are not picked up. Softness belongs to the brush and the eraser only, so its slider appears with them and goes away with them; a soft eraser is the same code, which is why it costs nothing. The pill on the panel edge folds the whole panel away once a tool is in hand, leaving a narrow strip, and the picture is fitted again to the space that frees up; the exit goes with the panel, and the system back button leaves the screen while it is folded. The picture is held against the top of the free space rather than centred in it, so opening or folding a panel changes only its size and never its position: one edge stays put and the eye has nothing to chase. Any closed shape can become a blur window instead of an outline: the photograph shows through it out of focus, which is how a face or a number gets hidden. The blur reads the photograph itself, so a caption placed on top stays sharp. The marker multiplies instead of covering: yellow drawn over black text leaves the text black, so the line stays readable, and overlapping passes darken. Marker strokes always sit under ordinary paint, the way a highlighter sits under a pen on paper. Taking a colour off the photograph is the sixth swatch in every colour row, and it lands where that row belongs: in the paint, in the selected caption, in the crop backdrop; it switches itself off once the colour is taken, and the colour lands in the custom slot. The exit arrow is the first cell of the row of switches rather than a row of its own: a whole line spent on one button is a line taken from the picture. Paint sits above or below the captions. Dashes are a slider rather than a switch, and they are measured in line widths: at the far left the line is solid, further along the dash and the gap grow together, from a fine dotted rhythm to long strokes. Because the length is tied to the width and the width is held as a fraction of the frame, the pattern survives zooming and saving at full size without a unit of its own. A second slider for the ratio of dash to gap was refused: it changes not the drawing of the line but its weight, and weight is already set by width and opacity. Dashes are hidden for the eraser and the marker, where they mean nothing. The grid is a button in the row of switches, not a two-item carousel taking a whole line; the same button sits on the insert screen and pulls the same handle. A frame with corner marks appears in the corner of the picture whenever what you see is not all of the sheet you are working on, and puts the sheet back into the screen. It measures the sheet rather than the original file, so that after cropping it neither nags nor shrinks your frame to something that is no longer there, and it disappears the moment there is nothing left to put back. It is not in any panel: fitting is needed the same way on every screen, and it takes no room at all while there is nothing to put back. Nothing else ever does that: since the day zoom arrived, no screen and no tool moves the picture on its own, because how close you are looking is your business and not the application\'s. Fitting it back is therefore a possibility rather than a habit, and it lives here, among the other ways of looking, rather than as a button of its own on the home screen.'],
+    ['Empty space', 'A picture that arrives with transparency of its own keeps it: the paper under the sheet starts as none rather than white, and saving to PNG gives back what was opened. White paper is invisible under an opaque photograph, which is why it stayed white for years without anyone noticing that it also painted over the empty places of a transparent one. The choice is asked once, when a new file opens; coming back to a page or returning after the app was killed keeps whatever you chose. Wherever there are no pixels — outside the sheet, where something has been cut away — the screen shows fine graph paper rather than plain black. Against a dark photograph black told you nothing about where the picture ended. The ruling holds its size on the screen rather than on the photograph, so it neither stretches when you zoom in nor collapses when you zoom out: it is the table, not the sheet. It never reaches a saved file. Its brightness is a slider on the cutting screen, running from black to white, because the edge of a pale photograph is invisible against a pale table and the edge of a dark one against a dark table, and which photograph you will bring is not something the application can know. The scale is neutral grey on purpose, so that the table never argues with the colours inside the frame. On the crop screen there is no table around the photograph: the whole of it is shown there, including the parts that will not enter the document, and the space around it belongs to the screen rather than to the document. Ruled, it would stop saying that nothing is there and start being wallpaper. Under the photograph the table is there as everywhere else, because a hole inside the picture belongs to the document and has to read as a hole: open a transparent PNG and its empty places are ruled on the crop screen exactly as they are on the canvas.'],
+    ['Crop', 'The frame runs over the sheet, and with margins and set size switched off the sheet is exactly the frame: there is no paper around it to reach. The whole sheet is painted here for the same reason — you should see what you are choosing from. Save and share from this screen send what is inside the frame, and the frame stays a frame: bite off a piece, pass it on, keep adjusting. The back arrow applies the frame, as it does on every other screen: leaving means leaving with what you did. Nothing is lost by it, since the frame is a value rather than baked pixels and the step back brings it right back. Drag the corners. The bottom row holds four: the way out, orientation, free, and ratio. The orientation button shows both positions at once, the current one solid and the other faint, so that what a tap will do is visible rather than remembered. Free is a picture rather than a word, a frame with its corners moving outward, and it keeps a cell of its own because it is taken more often than any ratio. The ratio button carries the one you are on and leads round on each tap: original first, then one to one, then the rest. Original is the true ratio of the photograph you opened, four to three or sixteen to nine, worked out and shown as a number: a picture could not say it, since every photograph has its own, and a number says it exactly and tells you what you are holding. There is no step back round the ring, only the next step. Above them the guide lines stand as pictures rather than words, four of them. Empty frame is none; the frame crossed by two lines each way is thirds; the one crossed off centre is the golden section; corner to corner is the diagonals. Corner rounding lives on the shape slider alone, since it does the same thing without steps. What it cuts away is empty, not paper: there is no paper anywhere in Jot any more. The way out is the first cell of the bottom row and an ordinary button rather than a circle: a circle here means a swatch, that is, a colour you are about to take. The backdrop was removed on the fourth of September: with margins gone, no leftover from a set size, and the rounding cut into the photograph itself, there was nothing left for it to colour. The shape slider runs from square corners to a full circle, and whatever is cut away is left empty rather than filled: the rounding is cut into the photograph itself, before the lens correction, so the oval bends with the picture instead of sitting over it like a frame. On screen the empty part shows the checkerboard. In a PNG it stays transparent; in a JPEG it comes out black, since that format has no transparency and black is the floor that remains when there is nothing to paint with. The photograph never leaves the frame: margins keep the backdrop, not a stray piece of the original. A margin is measured against the frame rather than against the original file, so cropping the photograph leaves the proportion of paper exactly as you set it: a border a quarter of the picture wide stays a quarter however much you cut away. This screen shows the photograph and nothing else — no paper, no table, no grid. A dashed line shows the edge of the sheet you are about to get, and the paper that will surround the frame is drawn in its own colour instead of being dimmed away. Focus, tilt on either axis and angle all eat into the frame, and they are fitted together rather than one after another: the largest upright rectangle that the corrected photograph covers completely. Fitting them in turn would measure each against a different edge and leave paper in the corners. Taken together they cost far less than they do apart, because the turn has already eaten the corners the lens correction would have taken. Cropping no longer touches the size you typed. It did until the first of September, when the sheet followed the frame — crop to a square and the file was that square. Then the size gained a second job, making the white bands round a picture, and letting one hand quietly wipe out what the other had asked for was worse than the surprise it saved. The frame cuts the picture; the sheet stays the number you set, and reset clears it in one tap. With stretch the sheet keeps the area you asked for and takes the proportion of the frame instead. Paper appears around the frame only where the sheet is genuinely wider than what you cut, and it is drawn while you choose rather than arriving in the file. What lies beyond that sheet is dimmed, because it is screen rather than document. The frame reaches paper as well as photograph: it selects a piece of the sheet, margins included, by its corners and by dragging alike. With a ratio taken, a corner is dragged against its opposite: that one stands still because your finger never touched it, and the frame follows as closely as the ratio allows. Without it the frame was assembled from four loose edges and then repaired around its middle, and the middle had already moved, so both corners drifted — the one you were holding as much as the one you were dragging. Dragging a corner shapes the frame, and so does the ratio button, and so does the orientation button. If a size has been set, its numbers are retuned to the new shape at the same area, whichever of the three you used, so that the crop and the size screen never claim different shapes for the same thing. Without that the numbers won, and a square cut out of a tall photograph arrived on the sheet squashed back into the old proportion.'],
+    ['Place', 'Margins are parked. The button is greyed and does nothing, and no sheet has any paper around it for the time being. The reason is a quarrel the app could not settle: crop bites the photograph while margins grow the sheet, and the hand quite reasonably expects the crop frame to reach the paper, which it cannot. Half a feature is worse than none, and on the third of September margins were put away for good rather than mended: a white sheet with the photograph placed on top gives you as much paper as you like and costs the app nothing. Everything else on this screen works as before, and nothing you have made is lost. What follows describes margins as they were, kept because the mechanism sleeps rather than being torn out. Three tools of equal standing, each behind its own button, and they behave differently on purpose. Margins is a mode: it latches on, turns on the red grips, and brings the backdrop colour with it — drag a grip inward from any edge and the sheet grows on that side. The backdrop was removed with them on the fourth of September: nothing needs paper under it any more. Add is an action: it picks one image and puts it on the picture. Stickers opens the pack. Clearing the margins sits next to the margins button, because that is all it clears, and it can be undone like anything else. The exit is the first cell of the same row. Nothing is switched on when the screen opens, so nothing is dragged by accident, and taking one tool lets the other go. Anything placed on the picture may also be dragged out onto the margins: a caption, an arrow, a sticker or a second image can sit on the paper beside the frame rather than on top of it. The room an object is given is measured from the sheet — the frame plus its margins — and it always keeps a little overhang past the edge, because carrying a corner of a sticker off the paper is a legitimate move rather than a mistake to be prevented. The screen of its own is gone from the second of September. Montage covered it to the last cell — add, stickers, grid, size, opacity, turn, delete — and a second door to one job is worse than a longer walk to it. Pictures and stickers are put down and edited there now, and the cell that used to open this screen is empty: the row keeps its four columns and waits rather than being filled for the sake of being full.'],
+    ['Jot TIFF', 'A separate screen, and it does one narrow thing: it wraps the pages of a scanned TIFF into a PDF without unpacking them. The compressed stream is carried across untouched, so nothing is re-encoded and nothing is lost — which is also why the support is partial by design. It handles what PDF can carry natively: CCITT group 3 and 4, LZW, PackBits and uncompressed, one or eight bits per channel, one or three channels, strips rather than tiles, a single plane. A TIFF outside that set is refused by name rather than converted badly: JPEG inside TIFF, sixteen bits, tiled layout, separate planes. This is a converter, not a viewer — such a file cannot be annotated in Jot. It speaks every language the application does: its words live in the same dictionary, chosen by the same setting, so a scan opened in Finnish reads in Finnish. It had a dictionary of its own until 3.230.0 — three languages, and Russian as the default rather than English.'],
+    ['Stickers', 'A pack you build yourself, one picture at a time. It starts empty. Add takes any image, brings its long side down to 512 pixels and keeps it as PNG, so transparency survives where it existed; a JPEG has none and will not gain any. Tapping a sticker chooses it, tapping again puts it on the picture, and delete removes the chosen one from the pack. Up to 200 stickers. The pack lives inside the application: it needs no permission, survives restart and update, does not appear in the gallery, and goes away when the application is uninstalled.'],
+    ['Adjust', 'Pick a quantity from the row of signs and move the single slider; the name of the chosen quantity stands next to it. Brightness, contrast, saturation, temperature, gamma, sharpness, blur, grain, vignette. Sharpness and blur make saving slower. One visit to this screen is one step back: the state is taken when you first move something, so nine dials moved in one visit undo together, and looking in and leaving again costs nothing. Cropping works the same way from 3.41.0: shape, backdrop and the frame itself are one visit and one step back, because to a hand they are one action. Auto stood in the bottom row until the fifth of September and has gone. It called the same engine as fix on the home row, at one fixed strength and without the paper reading, so it was a smaller version of that button rather than a second opinion: one door to a thing is enough, and fix keeps it. Nothing was lost with it — fix stretches the tones the same way and goes further. The numbers it leaves in the sliders can look odd: a dark photograph with clean highlights comes out with brightness down and contrast up, and that is the stretch, not a slip. Gamma moves only when the midtone has left the middle, and never by more than thirty — dusk on a photograph of a cabinet is a fact, not a flaw. Colours took its place. The button opens a screen of its own: eight circles in two rows of four, one slider, and three cells under it saying which of the three quantities the slider turns — hue, saturation, lightness. Each circle is a stretch of the hue wheel, and every pixel belongs to the one or two nearest it, so a change fades across the boundary instead of stepping over it: the sky keeps its gradient. The centres are spaced by eye rather than evenly, because between blue and magenta the eye sees more than it does between green and aqua. This is the tool for touching one colour and leaving the rest: the greenery in a photograph without the brickwork beside it, or the yellow of a cable without the yellow of the wall. It is worked out pixel by pixel rather than by the cheap filter path the other quantities use, since a hue is a function of all three channels at once; while you move the slider a reduced copy is used, and the full picture is done when the file is written. The button at the bottom is the plain reset. Temperature and saturation of the whole picture are left alone by fix: grey balance needs something grey, and on a photograph of foliage there is none, while the colour of a marking is data rather than taste. Fit whole puts the picture back exactly where it lands when a file is opened — a little below the Jot mark, not against the top edge: one opening, one fitting, one place. A second floating button appears beside fit whole once anything has been moved, whether by hand or by fix: hold it and the picture shows itself as it was before the corrections, let go and they come back. It is held rather than switched because a switched comparison can be left on and then the corrections look lost when they are not. It takes off the corrections only — filters live on their own screen and stay, since a comparison is of one thing against another rather than everything against nothing. If the tones are already even it does nothing and says so. If they could not be read at all it says something else, because a failure wearing the face of an ordinary answer would otherwise pass for a result. If the stretch needs more than the sliders can give it does what it can and says that too. Leaving the screen puts the tools back on the home row and fits the picture into the space that frees up. Every slider with a zero in the middle — the four corrections that go both ways, and the three rotations — has a notch at zero, marked on the track so it can be seen before you touch it. A finger let go near zero settles on zero and the app taps once to say so. The notch takes nothing away: the track is widened by the notch rather than the values swallowed by it, so one degree and minus one degree are still there, just a little further out than they used to be.'],
+    ['Sheet', 'The screen that owns the sheet rather than the photograph: how big it is, what colour the paper is, and which way round it stands. Size and Backdrop have sections of their own; what follows is the turning. Four cells: spin right, spin left, mirror, upside down. Each of them has its opposite in the same row, so nothing goes round any more and nothing has to be remembered. Until this version there was one spin cell and one mirror cell, and both walked a ring: turning the other way cost three taps and three steps of undo, and the mirror travelled four positions with the axis kept in its head. That was the price of a row of four, and the row is no longer the only one here. Taking both mirrors together gives a half turn, which the ring could not reach at all, so a mark in one corner can now be sent to any of the other three. The free angle is not in this row: it lives in the light geometry row on the home screen, and a cell that leads somewhere instead of doing something has no place among three that do. Both spin and mirror step back like anything else: the picture itself goes back with the markup, one tap of undo for one tap of the tool. Everything turns with the picture: captions, shapes, stickers, freehand paint and whatever has been cut away, and the crop and margins go round with it too. Turns and mirrors survive the application being killed, although the copy kept in memory is the original file: what is written down is not the turned pixels but the turn itself, and it is replayed when you come back. A mirror reverses everything it carries across, captions and inserted pictures included: they lie on the photograph rather than above it, so a caption that comes back unreadable is the answer and not a fault. Shapes and arrows are held by two points of their own and are turned round by the move itself, with nothing left to reverse. Mirror a second time and the writing reads again. Fine degrees for a crooked horizon are set by angle in the light geometry row, not here. Margins used to be taken here, by the cell beside turn and the backdrop. They are switched off. They are measured against the frame rather than the original file, so cropping leaves the proportion of paper exactly as you set it. They are fractions of the frame, and of different sides of it: a tenth on the left is a tenth of the width, a tenth on top is a tenth of the height. On a four to three photograph equal fractions therefore give unequal paper — four hundred points at the sides against three hundred above. That is the measure, not a fault; an even border on all four sides is a separate thing and is not built yet. Tilt lives on this screen from this version, in the two rows below the turning: one slider and, under it, the way out, the two axes and reset. It used to have a screen of its own, entered from the cell beside mirror; the reason given was that every tool deserves its own screen, and it outlived itself — a slider and two axes fit here with room to spare, and one screen fewer is one door, one number and one way back fewer to keep right. Both axes are built: vertical leans the width along the height, horizontal leans the height along the width. One slider serves both, and it drives whichever axis is taken; switching axis changes nothing, it shows you the other number. While your finger is on the slider the frame is held still and the picture moves under it, so you are correcting against something that does not follow you. The two axes are fitted together with focus and angle rather than one after another, and that matters: a shape narrowed at the top and at the side has an upright rectangle of its own, and fitting each in turn would shrink the frame a fifth more than it needs to. Reset clears both axes and nothing else. It is the only reset on this screen, and that is deliberate: spin and mirror each have their opposite cell, and a slider has none — an exact zero cannot be caught with a finger, and nearly zero is a crooked horizon for the rest of the work. A set size has no reset cell either; type over it or step back.'],
+    ['Size', 'Living inside the sheet screen, in its first row: the sheet holds five rows now — size, turning and mirrors, the tilt slider, the axes with their reset, and the row of ways out. It went out with margins for a few hours on the third of September because the two shared a row, which was a misreading: the row was shared, the tools are not. Margins draw paper; a set size gives the number of pixels the file will have. The exported pixel size of the sheet. Width, height, padlock, done — four cells, and no word beside them: the upper rows of a tool screen carry marks rather than labels, and the word for what they set stands in the lines below. There is one way of applying it, and the padlock is the only switch. Type numbers, tap the tick, and the sheet becomes those numbers exactly; the picture is scaled until it fits inside, keeps its proportion, sits in the middle, and whatever is left over is filled by the backdrop. With the padlock closed the second number follows the first in the proportion of the picture, so the two agree and nothing is left over. Open the padlock and they can disagree — and the paper that appears is the white border you asked for. Stretch and quick fit were two answers to one question and are gone; stretch was the only edit here that broke a picture without being asked to. There is no reset cell for the size: the only reset on this screen belongs to tilt, so a size is cleared by typing over it or by stepping back. Typing changes nothing by itself — with the padlock closed it would ask for a sheet forty thousand wide before your hand had finished the number. The colour wheel and the eyedropper beside reset set the same backdrop as Crop and Margins do, so a colour picked here shows up there. Numbers beyond twelve thousand a side or forty megapixels are brought down, but the proportion you asked for is kept and the toast says what was used instead. A quarter turn swaps the two numbers, because the fields show the sheet that will be written, not what your hand typed. Cropping no longer rewrites the size: the frame cuts the picture, and the sheet stays the number you asked for. With the padlock closed the second number follows the first by the proportion of the frame, and the picture grows or shrinks whole. Open it and the two numbers stand as typed: the picture is stretched to them, and its proportion changes because that is what you asked for by opening the lock. Neither way leaves paper around the picture — there is no paper outside the frame anywhere in Jot any more.'],
+    ['Letting go', 'The shredder is gone from the third of September, and with it the two holds and the red bar. A clean sheet now comes from one place only: restart the application, in the settings. What you get is a white A4 in portrait, as wide as your screen is in points — a small screen makes a small sheet, and that is the whole of the arithmetic, because drawing is heavy work for a phone and this application does not press you towards it. If you want a transparent sheet instead, the millimetre table and the cutter with its background removal will both give you one. Freeing the memory is no longer a destruction to be guarded: the file you opened is untouched on the device, only the markup goes, and the sheet that replaces it is paper rather than emptiness.'],
+    ['Backdrop', 'The paper behind the photograph has a colour and an opacity. The colour is a swatch — white, black, one of your own, or picked off the picture with the dropper; the opacity is a slider, and at zero there is no paper at all and the chequer shows through. PNG carries that transparency into the file as it is. JPEG and PDF cannot, so there the missing paper turns into a shade of black — half the opacity, half the darkness — and the screen shows it that way while a non-PNG format is chosen, so what you see is what you get. When transparency is doing real work — a mask, a cut-out, margins, fitting — Jot switches the format to PNG by itself and says so.'],
+    ['Lighter', 'A setting, off by default, because Jot does not shrink your photograph without saying so. With it on, a photograph larger than eight megapixels is accepted scaled down to that, and Jot says so once when it opens; everything after that — drawing, corrections, filters — runs on the smaller picture and runs faster. It changes the next photograph you open, not the one already in your hands. The stack of steps back is untouched: it holds descriptions rather than pixels, so shortening it would take away your steps and give back no speed.'],
+    ['One colour', 'Pick a colour on the photograph and everything else goes grey: the yellow cable stays yellow, the room around it does not. It is the same pick as cutting by colour — a point and a tolerance, every similar pixel rather than a connected patch — and only the outcome differs, so it lives on the same tool: tap the wand a second time and it switches between taking the colour away and leaving only it. It is a stage of the photograph rather than a filter, so your paint and captions keep their colours: they sit on the sheet, not in the picture. A step back removes it like any other edit.'],
+    ['Montage', 'The cell is called montage from the second of September, and it wears a patch rather than scissors: a dashed square for the hole and a solid one laid over it. Scissors would have promised the old cutting, and the tool is a different one now — take away and put back on one screen. Slava chose the word over collage, which is what I had proposed: montage is what the trade calls building a whole out of what was cut and what was put in. Erasing the photograph itself down to transparency: on the drawing screen a brush puts paint down, here it takes the picture away, and one word with two meanings on one screen would be a trap. Four tools: a line, keep, a lasso and the wand. The line takes the photograph away under your finger, and a second tap on it switches the line to putting it back — which of the two it is stands written on the button itself, always. Keep is the reverse of the lasso: trace a thing and the thing stays while everything outside it goes, so what was around it becomes a hole. It is the same outline as the lasso, drawn the same way and softened by the same slider; only the side that survives is different, so a thing traced badly can be traced again either way round. Both lassos show a dashed trace while the finger is down and cut when it lifts: with the reverse one the picture would otherwise vanish at the first millimetre and the rest would be traced blind. The trace shows the closing chord too, because the area is taken from the closed path. The oval and the polygon lasso were taken out when the row became four; work saved before that still draws them, you simply cannot make new ones. The freehand outline is traced with a finger and closes itself, taking the whole area inside rather than the strip under the finger; the polygon lasso sets its corners by tapping and waits for done, which suits technical subjects, because a hand shakes and a straight edge does not. Removal by colour takes everything close to the colour you tap, within a tolerance you set, and it takes all matching pixels rather than one connected patch, because sky on a photograph of equipment is usually broken up by branches and cables. It has one outcome and no hidden second one: to keep a single colour and grey out the rest, use one colour on the drawing screen, where the button stays lit while a colour is held. The restoring brush matters more than it looks — a hand always errs at the edge, and without it the only way back is undo. What is cut is kept as paths rather than as changed pixels, so a step back costs nothing and survives cropping. You may cut anywhere on the sheet, and you may crop after cutting: neither moves the other. Geometry is the exception and is named on its own screen. The cut goes through the whole sheet, backdrop included: cutting only the photograph would leave the white sheet showing through, which is not transparency at all. It goes through the sheet and stops there: paint, captions and stickers are marks on top rather than part of the picture, so an arrow drawn over a background survives the background being taken away. Two things do behave as picture and vanish with it — a highlighter stroke, which has nothing left to tint, and a blur window, which is a window into the photograph and shows nothing where the photograph is gone. Jot keeps a copy of the opened file inside itself, taken each time a file opens successfully, and it is that copy which brings the work back after the system closes the app: you open Jot and the photograph is there with everything you drew on it, which is why the file need not be in your gallery at all. The copy and the markup are matched by a signature of the file, so markup from one photograph can never land on another. A line says so when it happens, because a picture appearing by itself would otherwise read as a fault. A button that has gone pale is not broken and not asleep: touch it and it will say why it cannot act. Jot keeps a short log of its own failures inside itself; a failure that repeats every frame is written once rather than a thousand times. Some failures are deliberately silent because nothing is lost by them — a haptic tap that did not fire, a filter probe that answered no — and each of those carries its reason in the source rather than being merely left empty. Some are pale because there is nothing to do just now — a reset with nothing to reset — and those simply do nothing. Others are pale because the ability is switched off in this build, and those will tell you so. Margins and a set size are among them again, from the third of September. What does not come back is the ladder of undo: it weighs more than the document, it is not kept, and after a restore there is nothing to step back through. If the copy is lost while the markup survives, the markup is discarded and Jot says so — hunting for a file by its measurements would be guessing, and opening it again is quicker. Before a file is written Jot checks that the sheet was built at all: a canvas may quietly fail to start on a device short of memory, and the old result was a file that opened blank. If the sheet could not be built, nothing is written and Jot says so, so that a file you already have is never replaced by an empty one. Above twelve megapixels it also reads a handful of points where the photograph should be; if they all come out clear the file is still written, but with a warning, because a sheet cut away to nothing is a perfectly legitimate result and refusing to save it would be worse than a warning nobody needed. Duotone maps the photograph between two tones of your choosing; it starts from the colours of the app itself and the eyedropper beside it reads the original photograph rather than the filtered view, because a colour taken from a filtered picture would feed back into the filter and shift under your finger. Threshold has no half measure — it always cuts — so its strength slider moves where the cut falls instead. The filters come in three families. Colour matrices and curves recolour the photograph — grey, sepia, negative, posterise, pop art and the rest. One works on shape instead of colour: emboss reads each point together with its neighbours, so it finds edges rather than tinting them, and the strength slider blends the effect back towards the untouched photograph. Four of its family — outline, pencil, charcoal and neon — were taken out on the first of September. A hole may also be filled with a colour of your choosing, on the cutting screen: the colour button in the footer opens the same picker as everywhere else, and once a fill is in place that button wears the fill itself and its word changes to say that a tap will now take it away; the eyedropper next to it takes a colour from wherever the picture still has one — inside a hole there is no ground, so it refuses rather than inventing a shade. The fill is not the backdrop: the backdrop is paper under the photograph and the cut goes through it, while the fill is what the cut-away places are painted with, and it belongs to the cuts, leaving with them when a new photograph is opened. With a fill in place the file has no hole at all, so the warning about black holes stays quiet. Only PNG keeps transparency; in any other format an unfilled hole is filled black, because white reads as paper and black reads as absence. The corners left outside a rounded frame show what they will be rather than a grey veil, on the crop screen as on the canvas: ruling where the sheet will be empty, the backdrop colour where it will not. Emptiness always looks like emptiness on screen — the ruling shows through it whatever format is chosen, on the crop screen as on the cutting one. The format is your choice and Jot does not change it: only PNG keeps transparency, and if you save with a real hole to a format that has none, Jot says once that the empty places will come out black. Saving the same work twice, once flat and once with transparency, is a normal thing to want. A finished piece of work can go straight into the sticker pack from the saving screen: the sheet is built exactly as it is built for a file — crop, cut and fill included — and always as a PNG, because a sticker without transparency is a black rectangle. The limit of 512 points along the longer side and the size of the pack are the same on both roads into it. The handle at the top of a panel folds it away, by a tap or by a drag up and down. The circle of screens lives lower, on the strip just above the row of commands: a small ball sits in the middle of it: a tap on the ball moves the circle on — correction, caption, drawing, dispatcher — and a drag takes it either way. The ball is only twelve points across and catches the finger from four times that, which is why it can be hit without looking. The strip lies in the same place on all four, which is why the circle can leave the dispatcher as well as enter it. Screens outside the circle are reached from the dispatcher as before, and from any of them the ball leads back into the circle in one tap: outside the circle there is no next stop, so it takes you out to the dispatcher, which is the nearest one there is. Copying belongs to the cursor: take it, choose the object, and hold a finger on the move handle — the object goes into the pocket. There is no copy button in any row any more: both left when the rows became fours, and the floating button in the corner is what lays a copy down. With a drawing tool in hand neither door works, and both say so rather than going quiet: a hand that draws neither takes nor lays down. A shape you have just drawn is therefore not copied on the spot, which is deliberate; a floating button appears in the corner, under the compare button, wearing the shape of what you copied, and each tap on it puts another one down. That button is also how you know the pocket has anything in it, which is why it is a place of its own rather than another state of the button in the row: the button in the row copies and does nothing else, and it goes pale when there is nothing selected to copy. Copies go down on the same screens they are taken from — where a thing is edited is where it is copied and pasted. What decides is the hand rather than the screen: on the drawing screen the cursor takes and lays down, and with a brush in hand the button goes pale and says so; on the insert screen there are no tools to ask about, so it simply works. Copies land inside the sheet: in the part of it you are looking at rather than beside the original, which may be off screen, and in the middle of the sheet if you are looking away from it altogether. They step down and across so that none hides another, and the ladder turns back at the edge instead of walking off the sheet, where a shape is not drawn at all and only its handles would show. The pocket holds one thing, survives opening another photograph and does not survive closing Jot. A loupe window sits along the bottom of the screen while a finger is down, magnified two to six times as you choose. It is a window rather than a circle over the finger, because a circle covered the very place the work was happening, and it holds still for the whole stroke: it used to move aside when the finger came near, which was worse than being in the way, since the place you are looking at has to stay put or the eye catches it twice in one movement. What has been cut away shows there as the same ruling as on the canvas rather than as black, black being indistinguishable from a dark photograph. A row of insert sits on this screen from the second of September: add a picture, open the sticker pack, turn the grid on — the same three doors the insert screen carries, not copies of them, so they cannot drift apart. The grid had never been here at all, though a hand drawing a lasso has as much use for it as a hand drawing a line. Counting from the bottom: the ribbon of commands, then that row of insert with the way out first in it, then the older row of cutting, where delete now stands where the way out used to. Delete removes the picture you inserted, the same door the insert screen uses, and it works here because you can insert here. Reset beside it throws away every cut piece at once. Both are a single tap and both destroy, and both sit a finger width from the way out; a step back is all that guards them, and that is a question still open rather than an answer. Putting a picture or a sticker down here drops the cutting tool: no cell in the tool row is lit, and until you take one again a finger moves the picture rather than eating the photograph under it. That is the whole reason the tool row can be dark — before there was anything to insert here, a finger on this screen could only cut, and there was no state in which it did nothing. Delete goes pale when there is nothing selected to delete, and says so if you touch it anyway: on the insert screen the same button simply disappears along with the sliders, because that row has no shape to keep, while here it stands in a four and taking it out would break the row. A button gone pale is better than a missing one and better than an empty one, because it explains itself. Tap a picture or a sticker and the four sliders of cutting slide away to the left while three of the object come in from the right — size, opacity, turn — and the block changes height along with them, in one movement. There is no second screen behind that: the badge still says twelve, because you have not gone anywhere. Tapping a lit tool again lets it go, and the row goes dark: the line has three positions rather than two — take away, put back, nothing taken — so that one rule holds for all four cells. Without that there was no way at all to put a tool down by hand, and after the first cut a sticker could not be touched again.'],
+    ['Guides', 'Four kinds of line laid over the photograph: none, thirds, golden section and diagonals. Centre and safe area were dropped with the row that held them: the first is about placing a shot, the second about print bleed, and a marker needs neither daily. A finer graph paper was tried and dropped too: the twelve-step grid turned out to be fine enough, and anything denser only gets in the way. They serve the eye and never reach the file. Everything is measured in fractions of the frame rather than screen points, so zooming in does not thicken the grid: the cell grows with the picture. They are split by the job. Composition lines — thirds, golden section, diagonals — are chosen on the crop screen, where a frame is actually cut. Measuring lines are switched on by a button on the drawing and the insert screens, where things are placed and measured by them: a choice between two is on or off, not a carousel. One shared setting used to mean that a choice made for cropping turned up in drawing, and lines appeared that nobody had asked for. They show on those screens only: lines left over on the home screen would read as a mark that will not come off. A fifth use needs no choosing at all: while a finger is on one of the lens sliders, lines appear over the sheet and go the moment the finger lifts. Which lines depends on what the finger is correcting. The angle slider straightens a horizon, so it brings five level lines across the sheet and nothing else; the tilt slider brings five lines across the axis it is set to. In each family the middle line is drawn a little stronger, as an absolute to hold to when the picture itself offers nothing to line up against. Barrel correction bends the edges rather than levelling anything, so it keeps the square grid, twelve cells across the shorter side. It is drawn square to the screen rather than to the photograph, which is the whole point of it: the picture leans under the grid while the grid stands still, so a wall or a doorframe can be brought upright against it. Nothing is remembered and nothing is left behind, in the same way the thirds under a finger on the zoom slider are not. A spiral and a perspective grid were left out: each would first ask which corner or which vanishing point, and nothing would be visible until you answered.'],
+    ['Filters', 'Twenty-five of them, and the last one works differently from all the others. Twenty-four paint a point: they take the colour that is there and give back another colour in the same place. One of them used to move the point rather than paint it, and it is gone: easy geometry does the same bowing from its own screen, with one bake per frame instead of a filter on every draw. That needs a third machine, after the colour matrices and the convolutions, and it is built by redrawing the sheet in a grid of small pieces rather than by mixing colours. Strength works the same as everywhere: it mixes the distorted picture with the original one. Two things follow from moving points rather than colours, and both are deliberate. A hole cut earlier travels with the picture, so its edge bows along with everything else. Arrows and captions bow too, because they sit on the sheet and the sheet is what bends; a caption inside a glass ball reads oddly, and that is accepted rather than prevented. One filter over the whole picture, put on last: the photograph, the corrections, the paint, the captions and the stickers all at once. Change it and everything changes; take it off and nothing remains. Strength blends it with no filter at all, so a light sepia costs one slider rather than a separate entry. Trying six and settling on the seventh is one visit and therefore one step back, and the step really puts the filter back: which filter is on, and how strongly, now travel in the saved state along with the paint and the crop. Most are one colour matrix each; posterise, thermal and distance are curves per channel, because a step, a fold and a pressed middle cannot be written as a matrix; mosaic is not a colour filter at all but a change of size, and it is the one that hides a face or a plate. By colour keeps one colour alive and greys out the rest, which is how you say look at the yellow cable without drawing a single arrow. It starts working the moment you take it: the point it reads from sits in the middle of the sheet and the tolerance starts about a third of the way along, which is where the effect reads clearly on most photographs; widen it to keep more, narrow it to keep less. Tap anywhere on the picture to move that point; a loupe shows what is under your finger while it is down. Being a filter, it greys the arrows and captions along with the photograph, exactly as its neighbours do. Strength works differently where it must: for the stepped ones it changes the number of levels, since blending a step with a straight line gives a straight line rather than a gentler step. Some of them leave transparency alone and some paint it: posterise has no idea what nothing is, and neither has thermal. That is a property, not a fault. Duotone alone carries two tones of its own — shadow and light — with the swap button beside the reset: it puts the pair the other way round in one tap, instead of setting each tone again through the wheel. Swapping makes both tones yours, so the reset stops being idle and has something to return to. The two rings on the button move with the tones: the filled one is on whichever side now holds the darker colour, so the button shows the state rather than the deed. With sound on it answers with a short bright ring. The samples are your own photograph, because sepia on a face and sepia on a wiring diagram are different decisions. Seven were taken out on the first of September: blueprint, solarise, outline, pencil, charcoal, neon and fisheye. Fisheye took the grid distortion with it, and nothing was lost by that: easy geometry does the same barrel and pincushion from its own screen, with one bake per frame instead of a filter on every draw. Three arrived, and a fourth left again two days later. Africa is sun at noon and dust in the air: red up, blue cut hard. Helsinki is fog: colour down forty, everything pushed to blue-grey, blacks lifted, because fog does not give you real darkness. Distance flattens the midtones toward one value and leaves both ends whole: the everyday clutter of the middle goes and the silhouette stays. It is not posterise; that one steps, this one presses. A filter taken out does not break older work: a name the application no longer knows becomes no filter at all, rather than failing in silence. One cell after random opens a factory of frames rather than being a frame itself, the same way random is a door rather than a filter. The ninth frame is not in the grid at all but in the fourth place of the row of commands, and it is the only one with something inside it: shell writes the border rather than drawing it. Type into the line below the row and a band grows behind the words, from the top left corner to the right; when the side runs out it turns down the right edge, then along the bottom and up the left, and on completing a circle it steps inside the frame and starts the next turn, the way a snail does. The letters turn with the side they sit on, so the four sides read as one ribbon rather than four scraps. The slider under it means the height of the letters here rather than the place of the border: shell has no place to choose, it always runs from the outside in, and the word beside the slider changes with it. The width of the band follows the height of the letters, since two numbers for one thing would drift apart at the first edit. Text that will not fit is shrunk in steps until it does rather than being cut off, and it will not shrink past a third of what you asked for. There is a magnet on the turn: text that has all but filled a full circuit is spread out by its gaps until the tail meets the head, so the ring closes without a seam. Seven tenths of a circuit is the threshold — nearer than that and it is pulled shut, further and it simply ends where the words end. Emoji count as single characters here, skin tones, flags and joined families included, so a line of them comes out whole rather than in halves. The letters themselves are not stretched, only the spaces between them: a stretched letter reads as a printing fault, spacing reads as typesetting. The line you type into stands at the top of the panel rather than the bottom, where it is easier to see and to type.  The band starts white with black letters and takes any colour you give it from the same circles as everything else here; the letters always take the opposite of the band, so they read whichever colour you choose. White rather than the paper of the sheet: this frame has words inside it, and being readable matters more than matching the paper — and on a transparent sheet there is no paper to match. Like every frame it is a filter laid over the assembled sheet, so it does not lean with the angle and does not bend with the lens: it is a card around the picture rather than something written on it. The second cell of the grid, right after no filter at all, is lens: it moves the colour channels apart instead of painting them, red drifting one way and blue the other while green stays put, the way a cheap lens spreads them at the edges of a frame. It costs three passes over the sheet rather than one and counts no points by hand, and its cell shows a real sample rather than an icon, worked out the same way the picture is. Threshold left the grid to make room, and the count of cells came out even without a single blank: six rows of four. Four frames in the common grid gave two cells called negative — a filter and a frame under one word — and a factory grown to twenty would have broken the filter grid outright. A frame is a pair of clear glasses with a border. Being a filter, it goes on last, over everything — which is what a decoration should do, and here that is the way the thing is built rather than a promise somebody has to keep. The factory has a slider of its own, called edge rather than strength, because for a frame it means not how much but where: it runs between two ends — at nothing the border stands outside and the photograph is pressed inward by exactly its width, so not a point is lost; at full the border lies on the surface and the photograph keeps its size while the edge goes under. In between, part of each. Pressing inward costs a resample, so fine text on the photograph softens a little; at full there is no resample at all. There are eight, and each is a different mechanism rather than a different picture: a line, a doubled line, a dash, a bevel, a field, a shadow, four corners and a repeat. Almost everything else can be built out of those, and nothing at all out of eight similar ones. The factory grew from four to eight without a single cell of the filter grid moving, which is what the door cell was for. Their colour is the backdrop of the sheet until you choose otherwise: a frame is part of the paper rather than paint, and that stays the default rather than the rule. The row of circles on the factory screen is the same one the crop screen carries — white, black, your own colour, eyedropper — and reset gives the paper back. The cells in both grids carry drawn marks rather than previews of the photograph: a border a hundredth of the shorter side wide is not visible at all in a ninety-six point square, and eight such previews come out indistinguishable. A mark says what the frame is made of — four brackets, cut corners, two lines — and the hand understands it before it reads the word. What it looks like you see on the photograph itself, at full size, the moment you touch the cell. The negative alone keeps its own: film perforation is black by the definition of film. The first of them is random, and it is not a filter but a throw. Its cell carries two dice instead of a preview, because there is nothing to preview: until the throw, no filter exists. Tapping it does not set a filter — it opens a screen of its own, which arrives from the right and looks much like the filter screen it replaced. There is no preview there either, and none is wanted: the whole screen is the preview. Back and forward walk a shuffled deck of every real filter; each step also throws a new strength, somewhere between a quarter and four fifths of the track, because the point of a throw is the strength as much as the filter. Neither the strength you set by hand nor the order of the deck survives: step again and both are thrown afresh, leave and the deck is forgotten. The arrow returns to the filters you came from; more means done and takes you out to the home screen.'],
+    ['Appearance', 'Five themes, shown as swatches with their names under them, and the name matters: eighteen percent grey is the photographer\'s reference grey rather than merely a grey. One of the five is named after the application and takes the colour of the Jot mark; it carries the house yellow as its accent, and the accent follows the theme only for as long as you have not chosen one yourself. Choose a colour, and it stays through every change of theme. The yellow is in the accent row as well, so any theme can wear it. Five colours there rather than six: blue stood too close to teal, and a record that chose it now reads as teal rather than falling back to no colour at all. An accent is safe as a fill on any theme, since the letters on it are chosen for it; as a letter it is not, and on a light theme a colour too close to the background steps aside and lets the theme\'s own ink through. Darkening the colour instead was tried and refused: yellow on its way into shadow turns olive, still misses the mark and stops being the house colour. A yellow background was refused: a saturated colour around a photograph shifts how you read the colours inside it, and this is a tool for recording what is there.'],
+    ['Voice', 'Three kinds of thing get said, and they are not governed together. A refusal always speaks: you pressed a button that could not act, and silence there is indistinguishable from a broken app. An outcome — saved, copied, work restored — speaks only when voice is set to all; short, the default, keeps those quiet because you can see them happen. A hint that teaches a gesture is said once in the life of the app and again only after a reset. The switch sits at the foot of the settings beside reset, and it names its own position: voice short, or voice all.'],
+    ['Debug badge', 'Off by default, switched on in the settings, in the lower of the two rows at the bottom — the one that belongs to the taking-apart rather than to the hand: badge, lighter, log, BETA. It used to live inside the Log screen itself, which was wrong by one small measure: a hand looks for switches in the settings, and opens the log having already decided what it is looking at. When on, a small line sits in the top left corner and never moves: the number of the screen, its name, and whatever tool or mode is running. It reads 7 · sheet · sel, and it says the same thing on your phone as in the chat, which is the whole point of it — one name for one screen on both sides of the conversation. The words come from the code rather than the dictionary and stay English in every language: a translated badge would give the two of us different names for the same screen. The number is the place of the panel in the internal list and the canvas is zero, so a new screen is added at the end and never shifts the others. Nothing about the badge reaches the file; it is drawn over the app, not into the picture. The home screen has no number of its own and never had one: the badge names the open panel, and the home screen is the absence of one. It reads zero and canvas there. Screen one is crop, and the count starts from it.'],
+['Feedback', 'Sound or silence, and sound is the default: three events out of all of them speak, and hearing them the first time is worth more than the quiet. Sound on Android travels the media channel and is heard even with the ringer off, so it can be turned off in one tap. A buzz was considered and dropped, because vibration needs a system permission and Jot asks for none. The sound is a knock rather than a tone, computed rather than stored. Only three things speak: a panel sliding, a colour taken with the eyedropper, and a file saved. Nothing that you can already see needs a sound.'],
+    ['BETA', 'Off by default from the fifth of September, and it now switches something real: the debug badge and the log. With it off those two cells are dimmed and deaf — visible, so that you know they exist, but not to be pressed. Hidden would have been worse: a thing that is hidden cannot be told apart from a thing that was never built. Turn beta on and both wake up; turn it off again and the badge goes out with it, because a switch that switches nothing off is not a switch. It stood on by default while nothing hid behind it, and that was honest then and would be wrong now: this is the workshop, and the first thing a hand meets in the settings should not be ours.'],
+    ['Searching the reference', 'A field at the top of this page, from the third of September. Type a word and press the magnifier: every place it occurs is coloured, and you are taken to the first of them. Press again for the next, and after the last one it comes round to the first — there is no window telling you it has wrapped, because there are no windows in this application at all. Nothing found means nothing coloured, which needs no announcement either. Upper and lower case are not distinguished: you are looking for a word, not for a shape of letters. Opening this page always clears the field, so the reference greets you whole rather than holding somebody else\u2019s find.'],
+    ['Icons only', 'The last cell in the language grid, marked with a drawn sign rather than a flag — three shapes in place of three words. It stands last and not among the languages, because it is not one; from the third of September. It is not a language and has no dictionary of its own: English stays underneath it, and the words are simply not shown. They are hidden rather than removed, so the voice and the long press still know them — a blind reading of the screen loses nothing. Settings, this reference and the log keep their words in full, because those three explain, and explaining cannot be done with a sign. Hints stop appearing altogether, with one exception: the line after saving still names the folder and the file, because a path is an address rather than a word and this is the only place it is spoken. Cells that carry no sign keep their word as well — an empty rectangle is worse than a word in any language.'],
+    ['Names', 'The source file keeps its own name, followed by date and time to the second: KOHDE_A12_16-08-2026_15-32-07. When a source has no usable name, a remembered prefix is used instead. Rename freely before saving.'],
+    ['Saving', 'JPEG 92, JPEG 100, PNG or PDF. Pictures go to Pictures/Jot and a PDF goes to Download/Jot, because a document is not a picture and the gallery will not take it; the cell in the footer says only Jot, because the full path will not fit in it; the toast after writing says the whole path, so you always know where the file went. Or a folder you choose, through the chooser the system itself puts up: that road takes the work anywhere at all, including a folder named Jot at the root, which the app itself may not create. A finished sheet can also go straight into the sticker pack from the same footer. Transparency requires PNG and the format switches itself. The screen draws from a reduced copy of the photograph so that a large one stays quick under the finger; the file is written from the original at full size, and so is the loupe.'],
+    ['View', 'There is no button for this. Press and hold the picture to enter it: both bars go away and only the Jot sign stays. Two fingers zoom, a tap leaves. Holding does nothing while a drawing tool is in hand — there the finger is a pen. Leaving is a touch anywhere on the picture, and it does not have to be a still one: while the sheet is fitted to the screen there is nowhere to move it, so a touch means one thing only and a thumb that rolls a little still leaves. Zoom with two fingers and the picture can be dragged again, because now it has somewhere to go; from then on a touch that travels drags rather than leaves, and a short one still leaves. The system back button leaves as well, and so does the Jot sign, which comes out here on its way into the settings. Whatever you did to the view inside — how close you looked, where you dragged it — stays inside: the picture returns to exactly the view you left it at.'],
+    ['Session', 'Android kills applications that sit in the background, and no application can forbid it. So Jot copies the picture to itself when you open it, and writes down the marks whenever you leave the screen. Come back and everything is where you left it, even if the original has since been deleted from the phone. The copy is replaced only when another picture opens successfully: a file that fails to open has no power over the copy you already have. Failing to open now includes failing to answer at all: a very large picture can be abandoned halfway through decoding without a word from the system, and Jot waits twenty seconds and then says so rather than leaving you looking at the previous picture wondering whether you pressed anything. One picture is remembered, not a history. The step back does not survive: it weighs more than everything else together. The picture stays where you put it. It is laid out once, when the file opens, filling the width from the top; after that only your fingers move it. Changing tools or panels no longer refits it, so a close look survives a trip to another screen and even the app being killed. Fit whole lives in the row of floating buttons above the tools of the picture and shows up only while there is something left to put back; immersion returns you to exactly the view you left. A tall picture therefore arrives with that button already visible, and this is not a fault: it says that the sheet is longer than the screen and offers to show all of it. A PDF of a single sheet is covered like any picture, though it comes back as a picture and can no longer be saved as a document. A PDF of many pages is not covered, and opening one destroys the copy rather than leaving the older picture behind. Release, in the top row, destroys the copy and empties the screen; the file on the phone is untouched. The screen flashes to the colour of the theme. It is the one button in the app that has to be held rather than tapped, for six tenths of a second, and it fills as it charges so that you can see how much is left and that your finger may still be lifted. Let go early and nothing happens; slide off the button and nothing happens either. It alone is guarded because it alone destroys work rather than a setting — resetting the settings stays an ordinary tap, since guarding everything equally would teach you to hold everything and would therefore guard nothing.'],
+    ['Back', 'Three words do three things and never trade places. Undo takes back what you did, and it is the curved arrow in the command bar; it also drops a lasso you were still setting. More opens the drawer of screens and is drawn as four dots — there is no home to go to, because the dispatcher is a drawer rather than a place. Close leaves a screen laid over your work, settings or this reference, and returns to what was under it; it is the cross. Reset returns values to nothing and stays on the four places it already lived. A fourth word, cancel, used to sit on two of these jobs at once and is gone. The system back key closes one screen at a time and only then hides the application; the photograph stays in memory. The step back in the top row returns the work, and when it returns something that changes the size of the sheet — a crop or a change of geometry — it also returns the view you had at the time, since the old magnification belonged to a sheet that no longer exists. Undoing a stroke or a caption leaves your view alone: the sheet has not moved, and where you look at it from is your business.']
+  ],
+  limits: [
+    ['Side on export', '12000 px'],
+    ['Sticker side', '512 px'],
+    ['Stickers in the pack', '200'],
+    ['Area on export', '40 megapixels'],
+    ['Reading', 'JPEG, PNG, WebP, GIF, BMP, HEIC, PDF by page'],
+    ['TIFF, converter only', 'CCITT G3/G4, LZW, PackBits, uncompressed; 1 or 8 bits; strips'],
+    ['Writing', 'JPEG 92, JPEG 100, PNG, PDF'],
+    ['Transparency', 'PNG only; the format switches itself'],
+    ['Android permissions', 'none'],
+    ['Network calls', 'none']
+  ],
+  note: 'Probe. The fourth button in the maintenance row of the settings opens a report: what the app is holding at this moment — screen, tool, frame, rotation, sheet, cut, markup, undo depth, whether the canvas is alive, and how long a frame is taking — followed by a trail of what has been happening, newest at the bottom: screens entered, tools taken, edits, steps back, saving and letting go, with failures marked by an exclamation mark in the same line of events. A thing repeated in a row is counted rather than repeated, so twenty brush strokes are one line and not twenty. The magnifier keeps only the lines that match what you type, the two sheets copy the whole report to the clipboard, the bin empties the log, the cross closes. Nothing is sent anywhere and no permission is asked for: the report exists so that a screenshot of it can answer what was set at the moment something looked wrong.\n\nA number typed above a limit is brought down to it and said out loud. Silent rounding once cost a difference between the field and the file.',
+  signs: 'Signs'
+};
+
+var VOICE = {
+
+  'hBig':'once', 'hFlat':'once',
+  'hSaved':'done', 'hCopied':'done', 'hBack':'done', 'hReset':'done',
+  'hPdf':'done', 'hEye':'done', 'hCut':'done', 'hView':'done', 'hHold':'done',
+  'hPopGone':'done', 'hPopPick':'hint', 'hLite':'done', 'hBang':'done', 'hLiteOn':'done', 'hLiteOff':'done',
+  'hCopyHint':'hint'
+};
+
+var ICON = {
+
+  ratioFree: '<rect x="7" y="7" width="10" height="10" rx="1.5"/><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',
+
+  fbSnd: '<path d="M4 9.5h3.2L12 5.5v13l-4.8-4H4z"/><path d="M15.6 9.4a3.7 3.7 0 0 1 0 5.2"/><path d="M18.2 6.8a7.4 7.4 0 0 1 0 10.4"/>',
+  fbOff: '<path d="M4 9.5h3.2L12 5.5v13l-4.8-4H4z"/><path d="M15.5 19.5 21.5 4.5"/>',
+  text:  '<path d="M5 6V4h14v2M12 4v16M8 20h8"/>',
+  plate: '<rect x="3" y="7" width="18" height="11" rx="3"/>',
+  bubble:'<ellipse cx="12" cy="10" rx="9" ry="6"/><path d="M9.5 15.5 6.5 21 14 15.2"/>',
+  arrow: '<path d="M4 20 19 5M19 5h-7M19 5v7"/>',
+  crop:  '<path d="M6 2v16h16M2 6h16v16"/>',
+
+  folderIn: '<path d="M3 7.5V19a1.5 1.5 0 0 0 1.5 1.5h15A1.5 1.5 0 0 0 21 19V9H12L9.5 6H4.5A1.5 1.5 0 0 0 3 7.5z"/><path d="M12 11v5.5M9.5 14.5 12 17l2.5-2.5"/>',
+  view:  '<path d="M3 9V3h6M21 9V3h-6M3 15v6h6M21 15v6h-6"/>',
+  edit:  '<path d="M4 20l4-1L19 8l-3-3L5 16z"/>',
+  del:   '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>',
+  undo:  '<path d="M7 8h9a4 4 0 0 1 0 8h-6M7 8l3-3M7 8l3 3"/>',
+  rotate:'<path d="M20.5 12a8.5 8.5 0 1 1-2.6-6.1M20.5 3.5v5h-5"/>',
+  save:  '<path d="M12 3v11M8 10l4 4 4-4M4 19h16"/>',
+
+  share: '<path d="M9 13.5l6 3M15 7.5l-6 3"/>' +
+         '<circle cx="18" cy="18" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="6" r="3"/>',
+  caps:  '<path d="M4 6h16M4 11h10M4 16h13"/>',
+  open:  '<path d="M3 7h6l2 2h10v9H3zM3 7v11"/>',
+
+  bycolor:'<path d="M9 14a5 5 0 1 1 5-5"/><path d="M9 9h.01"/><path d="M14.5 13.5 20 19M17 12l4 4M12.5 16.5 17 21"/>',
+
+  gNone:  '<rect x="4" y="5" width="16" height="14" rx="2"/>',
+  gThirds:'<rect x="4" y="5" width="16" height="14" rx="2"/><path d="M9.3 5v14M14.7 5v14M4 9.7h16M4 14.3h16"/>',
+  gPhi:   '<rect x="4" y="5" width="16" height="14" rx="2"/><path d="M14.1 5v14M4 13.7h16"/>',
+  gDiag:  '<rect x="4" y="5" width="16" height="14" rx="2"/><path d="M4 5l16 14M20 5L4 19"/>',
+  gCenter:'<rect x="4" y="5" width="16" height="14" rx="2"/><path d="M12 5v14M4 12h16"/>',
+  gSafe:  '<rect x="4" y="5" width="16" height="14" rx="2"/><rect x="7" y="8" width="10" height="8" rx="1"/>',
+
+  whole:  '<rect x="6" y="7" width="12" height="10" rx="1"/><path d="M3 4l3 3M21 4l-3 3M3 20l3-3M21 20l-3-3"/>',
+
+  fitBox: '<rect x="3" y="3" width="18" height="18" rx="2"/><rect x="6" y="8" width="12" height="8" rx="1"/>',
+
+  tick:   '<path d="M5 13l4.5 4.5L19 7"/>',
+
+  colorflip: '<circle cx="9" cy="12" r="4.6" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="4.6"/>',
+
+  back:  '<path d="M15 5l-7 7 7 7"/>',
+  draw:  '<path d="M4 20c3-1 4-8 8-8s4 5 8 4"/><path d="M3 20h2"/>',
+  brush: '<path d="M4 20c3-1 4-8 8-8s4 5 8 4"/>',
+  eraser:'<path d="M8 20h11M4.5 16.5 12 9l5 5-6 6H7z"/>',
+  line:  '<path d="M4 20 20 4"/>',
+  rect:  '<rect x="4" y="6" width="16" height="12" rx="1"/>',
+  size:  '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M8 10h8M8 14h5"/>',
+
+  patch: '<rect x="3" y="5" width="12" height="12" rx="2" stroke-dasharray="3 2.4"/><rect x="10" y="9" width="11" height="10" rx="2"/>',
+
+  cam:   '<path d="M3 8a2 2 0 0 1 2-2h2.5l1.2-2h6.6l1.2 2H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="12" cy="12.5" r="3.4"/>',
+
+  place: '<rect x="3" y="4" width="13" height="13" rx="2"/><path d="M8 9v5M5.5 11.5h5"/><path d="M20 9v9a2 2 0 0 1-2 2H9"/>',
+  oval:  '<ellipse cx="12" cy="12" rx="9" ry="6.5"/>',
+  adjust:'<circle cx="8" cy="8" r="3"/><circle cx="16" cy="16" r="3"/><path d="M11 8h9M4 8h1M4 16h9M19 16h1"/>',
+
+  fix:   '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M8 15l3.2-3.2M13 9l2 2M11.6 10.4l2.8-2.8 1.6 1.6-2.8 2.8z"/>',
+  ezoom: '<rect x="6" y="7" width="12" height="10" rx="1.5"/><path d="M3 5v3M3 5h3M21 19v-3M21 19h-3"/>',
+  etext: '<path d="M5 8V6h10v2M10 6v11M7.5 17h5"/><path d="M17 12v6M14 15h6"/>',
+
+  egeo:  '<path d="M4 6v12h16"/><path d="M4 6h9"/><path d="M20 18V9"/><path d="M7 15c3.5-4 7-6.5 11-7.5"/>',
+  circle:'<circle cx="12" cy="12" r="8"/>',
+
+  copy:'<rect x="8" y="3" width="12" height="14" rx="2"/><path d="M5 7v12a2 2 0 0 0 2 2h9"/>',
+
+  find:  '<circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.3 15.3 21 21"/>',
+
+  keep:  '<path d=\"M6 8.5a7 5.5 0 1 1 0 7 7 5.5 0 0 1 0-7z\" stroke-dasharray=\"3 2.4\"/>' +
+         '<path class=\"sol\" d=\"M12 9.2a2.8 2.8 0 1 1 0 5.6 2.8 2.8 0 0 1 0-5.6z\"/>',
+
+  probe: '<rect x="2.5" y="4" width="19" height="14" rx="2"/><path d="M8 21h8"/>' +
+         '<path d="M5.5 11.5h3l1.5-3 2 5 1.5-2h5"/>',
+  sel:   '<path class="sol" d="M6 3l12.5 8.2-5.4 1.3 3.1 5.9-2.6 1.3-3.1-5.9L6 17.6z"/>',
+
+  eye:   '<path d="M14.6 3.6a2.3 2.3 0 0 1 3.3 3.3l-1.1 1.1-3.3-3.3z"/>' +
+         '<path d="M12.9 5.3 16.2 8.6 8 16.8a2 2 0 0 1-1 .5l-3.2.7.7-3.2a2 2 0 0 1 .5-1z"/>' +
+         '<path class="sol" d="M20 13c1.3 1.9 2 3.2 2 4a2 2 0 1 1-4 0c0-.8.7-2.1 2-4z"/>',
+  tri:   '<path d="M12 4 21 20H3z"/>',
+  free:  '<path d="M7.5 18.6c-3-1.2-4.6-4-4-6.8.6-2.9 3.3-5.4 6.6-6.2 3.3-.8 6.6.2 8.3 2.3 1.7 2.1 1.6 5-.4 7.2-2 2.2-5.6 3.5-8.6 3.4" stroke-dasharray="3.2 2.6"/>',
+  poly:  '<path d="M4 7 12 3.6 20 7.4 17 18 7 18.4z" stroke-dasharray="3 2.4"/>' +
+         '<path class="sol" d="M4 5.6a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3z"/>' +
+         '<path class="sol" d="M20 6a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3z"/>',
+  back2: '<path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 5v4h4"/>' +
+         '<path class="sol" d="M12 9.6a2.4 2.4 0 1 1 0 4.8 2.4 2.4 0 0 1 0-4.8z"/>',  guide: '<path d="M3 3h18v18H3z"/><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/>',
+  glass: '<circle cx="9.4" cy="12" r="4.6"/><circle cx="18" cy="10.4" r="3.4"/>' +
+         '<path d="M13.9 11.2a2.6 2.6 0 0 1 .7-.5M3 9.5C4.4 8 6 7.4 7.6 7.4M21.4 8.6c-.9-.9-2-1.3-3.1-1.3"/>',
+  mark:  '<path d="M5 19h5l8.6-8.6a2 2 0 0 0 0-2.8l-2.2-2.2a2 2 0 0 0-2.8 0L5 14z"/>' +
+         '<path d="M3.5 21h8"/>',
+
+  reveal:'<path d="M12 3.6a8.4 8.4 0 0 0 0 16.8" stroke-dasharray="2.4 3"/>' +
+         '<path d="M12 3.6a8.4 8.4 0 0 1 0 16.8"/>' +
+         '<path d="M5 16.2c3-2.6 5.6-3.4 8.4-3.4 2.2 0 4 .5 5.6 1.4"/>',
+  blurIn:'<circle cx="12" cy="12" r="8.4" stroke-dasharray="2.6 3.2"/>' +
+         '<path d="M8.6 13.4a3.4 3.4 0 0 1 3.4-3.4 3.4 3.4 0 0 0 3.4-3.4"/>' +
+         '<path d="M8.6 17a6.8 6.8 0 0 1 6.8-6.8"/>',
+  help:  '<circle cx="12" cy="12" r="9"/>' +
+         '<path d="M9.2 9.3a2.9 2.9 0 1 1 3.6 2.8c-.5.2-.8.7-.8 1.3v.5"/>' +
+         '<path class="sol" d="M12 16.4a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/>',
+  diam:  '<path d="M12 3 21 12 12 21 3 12z"/>',
+  hex:   '<path d="M12 3 20 7.5v9L12 21 4 16.5v-9z"/>',
+  star:  '<path d="M12 3.5l2.7 5.6 6.1.8-4.5 4.2 1.2 6-5.5-3-5.5 3 1.2-6L3.2 9.9l6.1-.8z"/>',
+  arc:   '<path d="M3 18a9 9 0 0 1 18 0"/>',
+
+  more:  '<circle cx="8" cy="8" r="1.6"/><circle cx="16" cy="8" r="1.6"/>' +
+         '<circle cx="8" cy="16" r="1.6"/><circle cx="16" cy="16" r="1.6"/>',
+
+  xmark: '<path d="M6 6l12 12M18 6L6 18"/>',
+
+  icons: '<circle cx="6" cy="12" r="3.2"/><rect x="9.8" y="8.8" width="6.4" height="6.4" rx="1"/><path d="M21 8.8l3.4 6.4h-6.8z" transform="translate(-1.6 0)"/>',
+  home:  '<path d="M3 11 12 3l9 8"/><path d="M6 10v10h12V10"/>',
+  back:  '<path d="M20 12H4"/><path d="M10 6l-6 6 6 6"/>',
+  pads:  '<rect x="3" y="5" width="18" height="14"/><rect x="7" y="9" width="10" height="6" stroke-dasharray="2 2"/>',
+
+  reset: '<rect x="3" y="5" width="18" height="14"/><rect x="7" y="9" width="10" height="6" stroke-dasharray="2 2"/><path d="M4 20 20 4"/>',
+  addpic:'<rect x="2" y="3" width="14" height="11" rx="2"/><circle cx="6" cy="7" r="1.3"/><path d="M3 13l3.5-3.5 3 3L12 10l4 3.5"/><path d="M19 15v6M16 18h6"/>',
+  pack:  '<rect x="3" y="7" width="13" height="13" rx="2"/><path d="M7 7V5a1 1 0 0 1 1-1h11a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1h-2"/><path d="M6 17l3-3 2.5 2.5L13 15l3 3"/>',
+  turnR: '<path d="M4 12a8 8 0 1 0 8-8h-4"/><path d="M11 1 8 4l3 3"/>',
+
+  turnL: '<path d="M20 12a8 8 0 1 1-8-8h4"/><path d="M13 1l3 3-3 3"/>',
+  flipH: '<path d="M12 3v18"/><path d="M9 7 4 12l5 5z"/><path d="M15 7l5 5-5 5z"/>',
+  flipV: '<path d="M3 12h18"/><path d="M7 9 12 4l5 5z"/><path d="M7 15l5 5 5-5z"/>',
+
+  sheet: '<path d="M6 3h8l4.5 4.5V20a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v5h4.5"/>',
+
+  vert:  '<rect x="3" y="9" width="18" height="6" rx="1.5" opacity=".3"/><rect x="8" y="3" width="8" height="18" rx="2"/>',
+
+  fwd:   '<path d="M9 5l7 7-7 7"/>',
+
+  hist:  '<path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 5v4h4"/><path d="M12 8v4.5l3 2"/>',
+
+  frames:'<rect x="2.5" y="7.5" width="14" height="11" rx="1.5"/><rect x="5.5" y="10.5" width="8" height="5" rx="0.5"/><path d="M7.5 4.5h12a1.5 1.5 0 0 1 1.5 1.5v9"/>',
+
+  fnShell: '<path d="M21 12a9 9 0 1 1-9-9"/><path d="M12 3a9 9 0 0 1 5 16"/><path d="M17 19a5 5 0 1 1-5-8"/>',
+  fnLine: '<rect x="3" y="5" width="18" height="14" rx="1"/><rect x="5.5" y="7.5" width="13" height="9" rx="1"/>',
+  fnTwin: '<rect x="3" y="5" width="18" height="14" rx="1"/><rect x="5" y="7" width="14" height="10" rx="1"/><rect x="7" y="9" width="10" height="6" rx="1"/>',
+  fnDash: '<rect x="3" y="5" width="18" height="14" rx="1" stroke-dasharray="3 2.4"/>',
+  fnBevel:'<path d="M6 5h12l3 3v8l-3 3H6l-3-3V8z"/>',
+  fnMat:  '<rect x="3" y="5" width="18" height="14" rx="1"/><rect x="7.5" y="9" width="9" height="6" rx="0.5"/>',
+  fnShade:'<rect x="3" y="5" width="18" height="14" rx="1" stroke-dasharray="1.4 1.6"/><rect x="6" y="8" width="12" height="8" rx="1"/>',
+  fnCorn: '<path d="M3 9V5h4M17 5h4v4M21 15v4h-4M7 19H3v-4"/>',
+  fnNeg:  '<rect x="3" y="5" width="18" height="14" rx="1"/><rect x="7" y="5" width="10" height="14"/><path d="M4.6 7.4v1.4M4.6 11.3v1.4M4.6 15.2v1.4M19.4 7.4v1.4M19.4 11.3v1.4M19.4 15.2v1.4"/>',
+  dice:  '<rect x="3" y="9" width="12" height="12" rx="2"/><rect x="9" y="3" width="12" height="12" rx="2"/><circle cx="7" cy="15" r="1"/><circle cx="11" cy="19" r="1"/><circle cx="15" cy="7" r="1"/>',
+  tiltV: '<path d="M7 4h10l3 16H4z"/>',
+  tiltH: '<path d="M4 7v10l16 3V4z"/>',
+  horz:  '<rect x="8" y="3" width="8" height="18" rx="2" opacity=".3"/><rect x="3" y="9" width="18" height="6" rx="1.5"/>',
+  shRect:'<rect x="4" y="5" width="16" height="14"/>',
+  shRound:'<rect x="4" y="5" width="16" height="14" rx="5"/>',
+  dash:  '<path d="M3 12h3M9.5 12h5M18 12h3"/>',
+  fillIn:'<rect x="4" y="6" width="16" height="12" rx="1.5"/><path class="sol" d="M6 8h12v8H6z"/>',
+  above: '<path d="M12 3 3 8l9 5 9-5z"/><path d="M3 14l9 5 9-5"/>',
+  lock:  '<rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>',
+
+  aBr:   '<circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5.2 5.2l2.1 2.1M16.7 16.7l2.1 2.1M18.8 5.2l-2.1 2.1M7.3 16.7l-2.1 2.1"/>',
+  aCo:   '<circle cx="12" cy="12" r="8"/><path class="sol" d="M12 4a8 8 0 0 1 0 16z"/>',
+  aSa:   '<path d="M12 3s6 6.6 6 10.5a6 6 0 0 1-12 0C6 9.6 12 3 12 3z"/>',
+  aTe:   '<path d="M14 13.8V5a2 2 0 1 0-4 0v8.8a4 4 0 1 0 4 0z"/><path d="M12 9v5"/>',
+  aGa:   '<path d="M4 20V4M4 20h16"/><path d="M4 20C6 9 10 5 20 4"/>',
+  aSh:   '<path d="M12 4 20 20H4z"/>',
+  aBl:   '<circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="8.5" stroke-dasharray="2 3.6"/>',
+  aGr:   '<path class="sol" d="M5 6h2v2H5zM11 4h2v2h-2zM16 7h2v2h-2zM7 12h2v2H7zM12 10h2v2h-2zM17 14h2v2h-2zM4 16h2v2H4zM10 17h2v2h-2zM16 19h2v2h-2z"/>',
+  aVi:   '<rect x="3" y="5" width="18" height="14" rx="2"/><ellipse cx="12" cy="12" rx="6.5" ry="4.5" stroke-dasharray="2 2.5"/>',
+
+  aMix:  '<circle cx="9.5" cy="10" r="5"/><circle cx="14.5" cy="10" r="5"/><circle cx="12" cy="14.5" r="5"/>',
+
+  mHue:  '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="4" r="2.2" class="sol"/>',
+
+  peek:  '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M12 5v14"/><path d="M15 8.5 18.5 8.5M15 12h3.5M15 15.5h3.5"/>'
+};
+'use strict';
+
+var TSZ = {1:1, 2:1, 3:2, 4:4, 5:8, 6:1, 7:1, 8:2, 9:4, 10:8, 11:4, 12:8};
+
+function parseIFDs(dv){
+  var b0 = dv.getUint8(0), b1 = dv.getUint8(1);
+  var le;
+  if (b0 === 0x49 && b1 === 0x49) le = true;
+  else if (b0 === 0x4D && b1 === 0x4D) le = false;
+  else throw new Error('notTiff');
+  if (dv.getUint16(2, le) !== 42) throw new Error('notTiff');
+
+  var out = [], off = dv.getUint32(4, le), guard = 0;
+  while (off && guard++ < 64){
+    var n = dv.getUint16(off, le), tags = {};
+    for (var i = 0; i < n; i++){
+      var e = off + 2 + 12*i;
+      var tag = dv.getUint16(e, le), typ = dv.getUint16(e+2, le), cnt = dv.getUint32(e+4, le);
+      var size = (TSZ[typ] || 1) * cnt;
+      var p = (size <= 4) ? (e + 8) : dv.getUint32(e+8, le);
+      var v = [];
+      for (var k = 0; k < cnt && k < 100000; k++){
+        if (typ === 3) v.push(dv.getUint16(p + 2*k, le));
+        else if (typ === 4 || typ === 9) v.push(dv.getUint32(p + 4*k, le));
+        else if (typ === 5){
+          var a = dv.getUint32(p + 8*k, le), b = dv.getUint32(p + 8*k + 4, le);
+          v.push(b ? a/b : 0);
+        }
+        else if (typ === 1 || typ === 2 || typ === 6 || typ === 7) v.push(dv.getUint8(p + k));
+        else v.push(0);
+      }
+      tags[tag] = v;
+    }
+    out.push(tags);
+    off = dv.getUint32(off + 2 + 12*n, le);
+  }
+  if (!out.length) throw new Error('notTiff');
+  return out;
+}
+
+function one(t, tag, dflt){ return (t[tag] && t[tag].length) ? t[tag][0] : dflt; }
+
+function dpiOf(t){
+  var r = one(t, 282, 300);
+  return (r === 200 || r === 300 || r === 400 || r === 600) ? r : 300;
+}
+
+function planPage(t){
+  var w = one(t, 256, 0), h = one(t, 257, 0);
+  if (!w || !h) throw new Error('broken');
+  if (t[322] !== undefined) throw new Error('tiled');
+  if (one(t, 284, 1) !== 1) throw new Error('planar');
+
+  var comp = one(t, 259, 1), photo = one(t, 262, 0);
+  var bps = one(t, 258, 1), spp = one(t, 277, 1);
+  if (spp !== 1 && spp !== 3) throw new Error('channels');
+  if (bps !== 1 && bps !== 8) throw new Error('depth');
+
+  var offs = t[273] || [], lens = t[279] || [];
+  if (!offs.length || offs.length !== lens.length) throw new Error('broken');
+  var rps = one(t, 278, h);
+  if (rps <= 0) rps = h;
+
+  var filter = '', parms = '', decode = '';
+  if (comp === 1) filter = '';
+  else if (comp === 2){ filter = '/Filter/CCITTFaxDecode'; parms = '/K 0/EncodedByteAlign true'; }
+  else if (comp === 3){
+    var t4 = one(t, 292, 0);
+    filter = '/Filter/CCITTFaxDecode';
+    parms = '/K ' + ((t4 & 1) ? '1' : '0') + ((t4 & 4) ? '/EncodedByteAlign true' : '');
+  }
+  else if (comp === 4){ filter = '/Filter/CCITTFaxDecode'; parms = '/K -1'; }
+  else if (comp === 5){
+    filter = '/Filter/LZWDecode';
+    var pr = one(t, 317, 1);
+    if (pr !== 1 && pr !== 2) throw new Error('predictor');
+    if (pr === 2) parms = '/Predictor 2/Colors ' + spp + '/BitsPerComponent ' + bps + '/Columns ' + w;
+  }
+  else if (comp === 32773) filter = '/Filter/RunLengthDecode';
+  else throw new Error('compression');
+
+  var ccitt = (comp >= 2 && comp <= 4);
+
+  if (!ccitt && photo === 0 && bps === 1) decode = '/Decode[1 0]';
+  if (!ccitt && photo === 0 && bps === 8) decode = '/Decode[1 0]';
+
+  var strips = [];
+  for (var i = 0; i < offs.length; i++){
+    var rows = Math.min(rps, h - i*rps);
+    if (rows <= 0) break;
+    strips.push({off:offs[i], len:lens[i], rows:rows, top:i*rps});
+  }
+  if (!strips.length) throw new Error('broken');
+
+  return {
+    w:w, h:h, dpi:dpiOf(t), strips:strips, filter:filter, parms:parms, decode:decode,
+    ccitt:ccitt, comp:comp, photo:photo, bps:bps,
+    cs: (spp === 3) ? '/DeviceRGB' : '/DeviceGray'
+  };
+}
+
+function num(x){
+  var s = (Math.round(x*100)/100).toString();
+  return s;
+}
+
+function convert(bytes){
+  var dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  var ifds = parseIFDs(dv);
+  var pages = [];
+  for (var i = 0; i < ifds.length; i++) pages.push(planPage(ifds[i]));
+
+  var out = [], off = [], total = 0;
+  function put(s){
+    if (typeof s === 'string'){
+      var a = new Uint8Array(s.length);
+      for (var i = 0; i < s.length; i++) a[i] = s.charCodeAt(i) & 0xff;
+      out.push(a); total += a.length;
+    } else { out.push(s); total += s.length; }
+  }
+
+  var num1 = 3;
+  var plan = [];
+  for (var p = 0; p < pages.length; p++){
+    var pg = pages[p];
+    var self = num1++;
+    var ims = [];
+    for (var s = 0; s < pg.strips.length; s++) ims.push(num1++);
+    var cont = num1++;
+    plan.push({pg:pg, self:self, ims:ims, cont:cont});
+  }
+
+  put('%PDF-1.4\n%\u00e2\u00e3\u00cf\u00d3\n');
+
+  function obj(n, head, raw, tail){
+    off[n] = total;
+    put(n + ' 0 obj\n' + head);
+    if (raw) put(raw);
+    if (tail) put(tail);
+    put('\nendobj\n');
+  }
+
+  var kids = plan.map(function(q){ return q.self + ' 0 R'; }).join(' ');
+  obj(1, '<</Type/Catalog/Pages 2 0 R>>');
+  obj(2, '<</Type/Pages/Kids[' + kids + ']/Count ' + plan.length + '>>');
+
+  for (var q = 0; q < plan.length; q++){
+    var it = plan[q], g = it.pg;
+    var k = 72 / g.dpi;
+    var pw = g.w * k, ph = g.h * k;
+    var res = '/XObject<<';
+    for (var m = 0; m < it.ims.length; m++) res += '/Im' + m + ' ' + it.ims[m] + ' 0 R';
+    res += '>>';
+    obj(it.self, '<</Type/Page/Parent 2 0 R/MediaBox[0 0 ' + num(pw) + ' ' + num(ph) +
+                 ']/Resources<<' + res + '>>/Contents ' + it.cont + ' 0 R>>');
+
+    var cs = '';
+    for (var j = 0; j < g.strips.length; j++){
+      var st = g.strips[j];
+      var data = bytes.subarray(st.off, st.off + st.len);
+      var dp = '';
+      if (g.ccitt) dp = '/DecodeParms<<' + g.parms + '/Columns ' + g.w + '/Rows ' + st.rows +
+                        '/BlackIs1 false>>';
+      else if (g.parms) dp = '/DecodeParms<<' + g.parms + '>>';
+      obj(it.ims[j],
+          '<</Type/XObject/Subtype/Image/Width ' + g.w + '/Height ' + st.rows +
+          '/ColorSpace' + g.cs + '/BitsPerComponent ' + g.bps + g.filter + dp + g.decode +
+          '/Length ' + data.length + '>>\nstream\n',
+          data, '\nendstream');
+      var y = ph - (st.top + st.rows) * k;
+      cs += 'q ' + num(pw) + ' 0 0 ' + num(st.rows * k) + ' 0 ' + num(y) + ' cm /Im' + j + ' Do Q\n';
+    }
+    obj(it.cont, '<</Length ' + cs.length + '>>\nstream\n' + cs + 'endstream');
+  }
+
+  var xref = total;
+  var last = num1 - 1;
+  var pad = function(n){ var s = String(n); while (s.length < 10) s = '0' + s; return s; };
+  var x = 'xref\n0 ' + (last+1) + '\n0000000000 65535 f \n';
+  for (var r = 1; r <= last; r++) x += pad(off[r] || 0) + ' 00000 n \n';
+  x += 'trailer\n<</Size ' + (last+1) + '/Root 1 0 R>>\nstartxref\n' + xref + '\n%%EOF\n';
+  put(x);
+
+  var res2 = new Uint8Array(total), at = 0;
+  for (var z = 0; z < out.length; z++){ res2.set(out[z], at); at += out[z].length; }
+  return {pdf:res2, pages:pages};
+}
+'use strict';
+
+var BR = (typeof Jot !== 'undefined') ? Jot : null;
+var PDF = null, NAME = 'velho';
+
+function t(k){ return T(k); }
+
+function $(i){ return document.getElementById(i); }
+function say(s){ $('s').textContent = s; }
+
+function labels(){
+  $('bSave').textContent = t('vSave');
+  $('bShare').textContent = t('vShare');
+  $('bOpen').textContent = t('vOpen');
+  $('bJot').textContent = t('vJot');
+
+  $('vTiny').textContent = t('vTiny');
+}
+
+function b64(u8){
+  var out = '', N = 32768;
+  for (var i = 0; i < u8.length; i += N){
+    var s = '';
+    var end = Math.min(i + N, u8.length);
+    for (var j = i; j < end; j++) s += String.fromCharCode(u8[j]);
+    out += s;
+  }
+  return btoa(out);
+}
+
+function baseName(){
+  var n = '';
+  try { if (BR && BR.srcName) n = BR.srcName() || ''; } catch(e){}
+  n = String(n).replace(/\.[^.]*$/, '').replace(/[\\\/:*?"<>|]/g, '').trim();
+  return n.length ? n : 'velho-' + Date.now();
+}
+
+function run(){
+  if (BR && BR.has && !BR.has()){ say(t('vNone')); return; }
+  say(t('vWait'));
+  fetch('/image?t=' + Date.now()).then(function(r){ return r.arrayBuffer(); }).then(function(b){
+    var u = new Uint8Array(b);
+    var r = convert(u);
+    PDF = r.pdf;
+    NAME = baseName();
+    var g = r.pages[0];
+    var kb = Math.round(PDF.length/1024);
+    say(t('vOk').replace('%p', r.pages.length + ' × ' + g.w + '×' + g.h)
+                .replace('%s', kb + ' ' + t('vKb')) + '\n' + NAME + '.pdf');
+    $('bSave').disabled = false;
+    $('bShare').disabled = false;
+    $('bJot').disabled = !(BR && BR.stash);
+  }).catch(function(e){
+
+    var k = (e && e.message) ? e.message : 'fail';
+    var key = 'v' + k.charAt(0).toUpperCase() + k.slice(1);
+    say(T(key) === key ? (t('vFail') + k) : t(key));
+  });
+}
+
+function send(mode){
+  if (!PDF || !BR || !BR.begin) return;
+  try {
+    var s = b64(PDF), N = 262144;
+    BR.begin();
+    for (var i = 0; i < s.length; i += N) BR.chunk(s.substr(i, N));
+    BR.end('pdf', NAME, mode);
+    if (mode === 0) say(t('vSaved') + '\n' + NAME + '.pdf');
+  } catch(e){ say(t('vFail') + e); }
+}
+
+function toJot(){
+  if (!PDF || !BR || !BR.stash) return;
+  try {
+    var s = b64(PDF), N = 262144;
+    BR.begin();
+    for (var i = 0; i < s.length; i += N) BR.chunk(s.substr(i, N));
+    BR.stash(NAME);
+  } catch(e){ say(t('vFail') + e); }
+}
+
+function boot(){
+  labels();
+  $('bJot').onclick = toJot;
+  $('bSave').onclick = function(){ send(0); };
+  $('bShare').onclick = function(){ send(1); };
+  $('bOpen').onclick = function(){ if (BR && BR.pick) BR.pick(); };
+  run();
+}
+
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+else boot();
+</script>
+</body>
+</html>

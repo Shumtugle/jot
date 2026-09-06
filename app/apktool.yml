@@ -1,0 +1,19 @@
+version: 2.12.0
+apkFileName: jot.apk
+usesFramework:
+  ids:
+  - 1
+  tag: null
+sdkInfo:
+  minSdkVersion: '29'
+  targetSdkVersion: '34'
+packageInfo:
+  forcedPackageId: '127'
+  renameManifestPackage: null
+versionInfo:
+  versionCode: '503'
+  versionName: 3.327.0
+sparseResources: false
+compactEntries: false
+doNotCompress:
+- resources.arsc

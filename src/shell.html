@@ -1,0 +1,1126 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Jot</title>
+<style>
+:root{ --bg:#000; --bar:rgba(24,24,27,.9); --btn:#26262b; --btn2:#3a3a42;
+  --ink:#f2f2f4; --dim:#9a9aa2; --hot:#f2f2f4; --hot2:#141416; --solid:#18181b;
+
+  --cmdGap:12px;
+
+  --barPad:5px;
+  --cmdSole:max(var(--cmdGap), env(safe-area-inset-bottom, 0px));
+
+  --cmd:calc(var(--btnH) + var(--barPad) + var(--barPad) + var(--cmdSole));
+
+  --btnH:52px; --floS:44px; --rBtn:16px;
+
+  --topBar:52px; --swS:44px; --gripH:22px; --gripFold:40px; --gl:22px;
+
+  --rail:clamp(232px, 28%, 300px);
+
+  --leadW:calc((100% - 12px)/4); }
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
+  font:15px/1.35 -apple-system,Roboto,system-ui,sans-serif;user-select:none;-webkit-user-select:none}
+
+#cv{position:absolute;inset:0;width:100%;height:100%;touch-action:none;display:block;
+  -webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+
+.bar{position:absolute;left:0;right:0;display:flex;gap:4px;padding:var(--barPad) 6px;
+
+  background:var(--bar);z-index:5}
+
+.bar,.panel{background-image:linear-gradient(var(--bar),var(--bar)),
+  linear-gradient(var(--bg),var(--bg))}
+
+#bMenu{position:absolute;top:6px;right:8px;z-index:14;width:46px;height:46px;padding:0;
+  border:0;border-radius:23px;
+
+  background:var(--signPad)}
+
+#bMenu svg{width:46px;height:46px;display:block;fill:none;stroke:currentColor;
+  stroke-width:4.6;stroke-linecap:round;stroke-linejoin:round}
+#bMenu{color:var(--hotInk)}
+
+#cmd{bottom:0;display:grid;grid-template-columns:repeat(4,1fr);gap:4px;z-index:7;
+  padding-bottom:calc(var(--barPad) + var(--cmdSole))}
+
+#cmd::before{content:'';position:absolute;left:0;right:0;bottom:100%;
+  height:var(--cmdGap);background:var(--bg)}
+
+.caprow{color:var(--dim);font-size:13px;margin-top:10px}
+.caprow + .pals{margin-top:4px}
+
+#ringdot{position:absolute;left:50%;bottom:100%;transform:translateX(-50%);
+  width:48px;height:calc(var(--cmdGap) + var(--barPad));min-width:0;min-height:0;border:0;
+  padding:0;margin:0;background:transparent;box-shadow:none;flex:0 0 auto;
+  display:flex;align-items:center;justify-content:center;
+  touch-action:none;-webkit-tap-highlight-color:transparent;z-index:13}
+
+#ringdot i{display:block;width:12px;height:12px;border-radius:50%;
+  background:var(--dim);opacity:.7;transition:background .12s ease,
+  opacity .12s ease,transform .12s ease}
+#ringdot:active i{background:var(--hot);opacity:1;transform:scale(1.25)}
+
+.bar#cmd button{min-width:0;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:2px;min-height:var(--btnH);font-size:clamp(9px,2.7vw,10px);font-weight:500;
+  line-height:1}
+
+.bar#cmd button svg{width:var(--gl);height:var(--gl);flex:0 0 auto;fill:none;
+  stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.bar#cmd button svg .sol{fill:currentColor;stroke:none}
+
+#bot{position:relative;display:block;padding:0 6px var(--barPad)}
+
+#bot button{min-width:0}
+.bar button{flex:1 1 0;min-width:0;min-height:var(--btnH);padding:0 4px;border:0;border-radius:var(--rBtn);
+  background:var(--btn);color:var(--ink);font:inherit;font-weight:600;font-size:13px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar button:active{background:var(--btn2)}
+.bar button.flat{background:transparent;color:var(--dim);font-weight:500}
+
+#bot svg{width:var(--gl);height:var(--gl);fill:none;stroke:currentColor;
+  stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+
+.panel{position:relative;padding:10px 6px var(--barPad);border-radius:20px 20px 0 0;
+  display:none;
+  max-height:calc(88vh - var(--cmd) - var(--cmdGap));overflow:auto}
+.panel.open{display:block}
+.panel.open.vhide{display:none}
+
+.slidebay{display:grid;transition:max-height .22s ease;overflow:hidden}
+.slidebay>.slide{grid-area:1/1;transition:opacity .18s ease, transform .18s ease}
+
+.slidebay>.slide.away{opacity:0;transform:translateX(18px);pointer-events:none;
+  visibility:hidden}
+.slidebay>.slide.away.left{transform:translateX(-18px)}
+.panel.sub{transition:transform .2s ease}
+
+.dicebox{width:96px;height:96px;display:flex;align-items:center;justify-content:center}
+.dicebox svg{width:44px;height:44px;fill:none;stroke:currentColor;stroke-width:1.6;
+  stroke-linecap:round;stroke-linejoin:round}
+.panel.sub.riding{transform:translateX(100%)}
+
+.row{display:flex;gap:4px;margin-top:8px;align-items:center;flex-wrap:wrap}
+
+.row.foot{gap:4px}
+.row button{flex:1 1 0;min-width:64px;min-height:var(--btnH);border:0;border-radius:var(--rBtn);background:var(--btn);
+  color:var(--ink);font:inherit;font-weight:600;font-size:14px}
+
+button.off{opacity:.35;pointer-events:none}
+
+button.dim{opacity:.35}
+
+.row.keys{display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
+
+.row.keys + .row{margin-top:16px}
+
+.row.keys.two{grid-template-columns:repeat(2,1fr)}
+
+.row.keys.six{grid-template-columns:repeat(6,1fr)}
+.row.keys .wide4{grid-column:span 4}
+.row.keys .wide2{grid-column:span 2;font-size:12px}
+.row.keys.four{grid-template-columns:repeat(4,1fr)}
+.row.keys.five{grid-template-columns:repeat(5,1fr)}
+.row.keys button{min-width:0}
+
+.row.keys button.grp{position:relative}
+.row.keys button.grp::after{content:'';position:absolute;right:6px;bottom:5px;
+  width:14px;height:2px;border-radius:1px;
+  background:radial-gradient(circle,currentColor 55%,transparent 56%) 0 0/5px 2px repeat-x;
+  opacity:.55;pointer-events:none}
+.row.keys button.grp.on::after{opacity:.85}
+
+.sw.eye{background:var(--btn2);display:flex;align-items:center;justify-content:center}
+.sw.eye svg{width:var(--gl);height:var(--gl);fill:none;stroke:var(--ink);
+  stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.sw.eye svg .sol{fill:var(--ink);stroke:none}
+.sw.eye.on{background:var(--hot)}
+.sw.eye.on svg{stroke:var(--hot2)}
+.sw.eye.on svg .sol{fill:var(--hot2)}
+
+.row button.ok{background:transparent;box-shadow:inset 0 0 0 2px var(--hotInk);color:var(--hotInk)}
+.row button.ok:active{background:var(--btn)}
+
+.row button.back{color:var(--hotInk)}
+
+.row button[disabled]{opacity:.35}
+
+.col{display:flex;flex-direction:column;gap:4px;margin-top:8px}
+.col button{min-height:var(--btnH);border:0;border-radius:var(--rBtn);background:var(--btn);
+  color:var(--ink);font:inherit;font-weight:600;font-size:15px;text-align:left;padding:0 18px}
+
+.row button[data-i]{display:flex;align-items:center;justify-content:center}
+.row button[data-i] span{display:none}
+.row svg,#top svg{pointer-events:none}
+.row button svg{width:var(--gl);height:var(--gl);fill:none;stroke:currentColor;
+  stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.row button svg .sol{fill:currentColor;stroke:none}
+
+.row button.lbl{display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:3px;min-height:var(--btnH);
+  font-size:clamp(9px,2.9vw,11px);font-weight:500;line-height:1}
+
+.row button.lbl span{display:block;max-width:100%;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row button.pic img{width:26px;height:26px;display:block;pointer-events:none}
+
+button.swb{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:5px;
+  border:0;padding:0;background:transparent;color:var(--dim);border-radius:0;
+  min-height:0;font:inherit;font-size:11px;font-weight:500;min-width:0}
+button.swb.on{background:transparent;color:var(--ink)}
+.swb i{display:block;width:40px;height:40px;border-radius:50%;
+  border:2px solid var(--btn2);background:var(--c,rgba(0,0,0,0))}
+
+#themes .swb i{width:var(--swS);height:var(--swS);border-width:2px;
+  border-color:var(--btn2);background:var(--c)}
+.swb.on{color:var(--ink)}
+.swb.on i{border-color:var(--ink);border-width:3px}
+.swb i,.swb span{pointer-events:none}
+
+.swcell i{display:block;width:26px;height:26px;border-radius:50%;
+  border:2px solid currentColor;background:var(--c,rgba(0,0,0,0))}
+
+.row button.lbl.word::before{content:'';display:block;width:var(--gl);height:var(--gl)}
+
+.row button.lbl.ratiocell{justify-content:center;font-size:19px;font-weight:600;
+  letter-spacing:.01em;gap:0}
+.swb.own i{background:
+  linear-gradient(90deg,rgba(0,0,0,0) 0 50%,var(--own,rgba(0,0,0,0)) 50% 100%),
+  conic-gradient(from 180deg,#e01b24,#ffd400,#1e9e4a,#00bcd4,#1a6fd4,#8e24aa,#e01b24)}
+
+.swb i svg{width:var(--gl);height:var(--gl);fill:none;stroke:var(--ink);stroke-width:2;
+  stroke-linecap:round;stroke-linejoin:round;margin:7px}
+.swb i svg .sol{fill:var(--ink);stroke:none}
+.swb.on i svg{stroke:var(--hotInk)}
+
+#bFb i{width:var(--swS);height:var(--swS);border-color:var(--btn2)}
+#bFb i svg{stroke:var(--ink)}
+#bFb{color:var(--dim)}
+.swb.ck i{background:
+  linear-gradient(45deg,#8a8a8a 25%,transparent 25%,transparent 75%,#8a8a8a 75%) 0 0/12px 12px,
+  linear-gradient(45deg,#8a8a8a 25%,#d8d8d8 25%,#d8d8d8 75%,#8a8a8a 75%) 6px 6px/12px 12px}
+.chipwrap{position:relative;margin-top:8px}
+
+.row.ratiorow{align-items:stretch;flex-wrap:nowrap}
+.row.ratiorow>button{flex:0 0 auto;min-width:52px}
+.row.ratiorow>.chipwrap{flex:1 1 auto;min-width:0;margin-top:0}
+.chips{display:flex;gap:4px;overflow-x:auto;padding:0 26px 2px;
+  -webkit-overflow-scrolling:touch;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+
+.chv{position:absolute;top:0;bottom:2px;width:26px;border:0;padding:0;z-index:2;
+  background:transparent;color:var(--dim);font-size:18px;font-weight:700;line-height:1;
+  text-shadow:0 0 6px var(--bar), 0 0 3px var(--bar)}
+
+.chipwrap.atL .chv.l, .chipwrap.atR .chv.r{display:none}
+.chipwrap.atL .chips{padding-left:0}
+.chipwrap.atR .chips{padding-right:0}
+
+.chips{-webkit-mask-image:linear-gradient(90deg, transparent 0, #000 26px, #000 calc(100% - 26px), transparent 100%);
+  mask-image:linear-gradient(90deg, transparent 0, #000 26px, #000 calc(100% - 26px), transparent 100%)}
+.chipwrap.atL .chips{-webkit-mask-image:linear-gradient(90deg, #000 0, #000 calc(100% - 26px), transparent 100%);
+  mask-image:linear-gradient(90deg, #000 0, #000 calc(100% - 26px), transparent 100%)}
+.chipwrap.atR .chips{-webkit-mask-image:linear-gradient(90deg, transparent 0, #000 26px, #000 100%);
+  mask-image:linear-gradient(90deg, transparent 0, #000 26px, #000 100%)}
+.chipwrap.atL.atR .chips{-webkit-mask-image:none;mask-image:none}
+.chv.l{left:0;border-radius:16px 0 0 16px}
+.chv.r{right:0;border-radius:0 16px 16px 0}
+.chips button{flex:0 0 auto;min-height:var(--btnH);padding:0 14px;border:0;border-radius:var(--rBtn);
+  background:var(--btn);color:var(--ink);font:inherit;font-weight:600;font-size:14px;white-space:nowrap}
+
+.chips.ico{padding:0;overflow:visible;display:grid;gap:4px}
+.chips.ico button{min-width:0;padding:0;display:flex;
+  align-items:center;justify-content:center;min-height:var(--btnH)}
+
+#loupe{position:absolute;left:0;right:0;bottom:0;height:30vh;z-index:11;
+  display:none;background:#000;border-bottom:1px solid var(--btn2);overflow:hidden}
+#loupe.on{display:block}
+
+#loupe canvas{width:100%;height:100%;display:block}
+
+.grip{position:absolute;top:0;left:50%;transform:translateX(-50%);
+  width:96px;height:var(--gripH);border:0;padding:0;background:transparent;
+  display:flex;align-items:center;justify-content:center;z-index:2;
+  touch-action:none;-webkit-tap-highlight-color:transparent}
+
+.grip i{display:block;width:44px;height:11px;background:var(--dim);opacity:.6;
+  clip-path:path('M0,5.2 Q22,1.7 44,5.2 L44,9.2 Q22,5.7 0,9.2 Z');
+  transition:clip-path .22s ease}
+.panel.folded .grip i{clip-path:path('M0,1.8 Q22,5.3 44,1.8 L44,5.8 Q22,9.3 0,5.8 Z')}
+
+.grip:active i{opacity:1;background:var(--hot)}
+.foldable{padding-top:var(--gripH)}
+
+.fbody{overflow:hidden;max-height:1200px;opacity:1;
+  transition:max-height .22s ease, opacity .16s ease}
+.panel.folded .fbody{max-height:0;opacity:0}
+
+.panel.folded .foot{display:none}
+
+.panel.folded.keeps{padding-top:calc(var(--gripFold) + 4px)}
+.panel.folded.keeps .foot{display:flex}
+.panel.folded .grip{left:0;right:0;width:auto;transform:none;height:var(--gripFold);
+  align-items:center}
+
+.row.phead{position:sticky;top:0;z-index:3;background:var(--solid);
+  margin-top:0;padding:4px 0 6px;flex-wrap:nowrap}
+.row.phead .ttl{flex:1 1 auto;font-size:19px;font-weight:700;min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.chips.ico.four{grid-template-columns:repeat(4,1fr)}
+.chips.ico.five{grid-template-columns:repeat(5,1fr)}
+.chips.ico.six{grid-template-columns:repeat(6,1fr)}
+.chips.ico.seven{grid-template-columns:repeat(7,1fr)}
+.chipwrap.ico .chv{display:none}
+.chips button[data-i] span{display:none}
+
+.chips svg{width:var(--gl);height:var(--gl);display:block;pointer-events:none;fill:none;stroke:currentColor;
+  stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.chips svg .sol{fill:currentColor;stroke:none}
+
+.lab.has{min-width:0;flex:0 1 auto}
+
+.labpair{flex:0 0 var(--leadW);min-width:0;display:flex;align-items:baseline;gap:6px}
+.num{flex:0 0 auto;text-align:left;color:var(--hotInk);font-size:14px;font-weight:600}
+
+.lab.numy{color:var(--hotInk)}
+#refTitle{font-size:19px;font-weight:700;margin:2px 0 6px}
+#refBody b{display:block;margin-top:12px;font-size:14px}
+#refBody div{color:var(--dim);font-size:13px;line-height:1.45;margin-top:4px}
+#refBody table{width:100%;border-collapse:collapse;margin-top:6px}
+#refBody td{color:var(--dim);font-size:13px;padding:3px 0;vertical-align:top}
+#refBody td+td{text-align:right;color:var(--ink)}
+
+.panel.full{position:fixed;top:0;bottom:0;left:0;right:0;max-height:100%;border-radius:0;padding-top:64px;z-index:12}
+
+#probe{background:#000;padding-top:14px}
+#probeT{flex:1 1 auto;overflow:auto;margin:0;color:#cfe0cf;background:#000;
+  font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;line-height:1.45;
+  white-space:pre-wrap;word-break:break-word;-webkit-user-select:text;user-select:text}
+
+.flags button svg{width:26px;height:26px;display:block;margin:0 auto;
+  fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;
+  stroke-linejoin:round;pointer-events:none;color:var(--hot)}
+
+.flags button.on svg{color:var(--hot2)}
+
+html.icons .row button.lbl span{display:none}
+html.icons #menu .row button.lbl span,
+html.icons #ref .row button.lbl span,
+html.icons #probe .row button.lbl span{display:inline}
+
+html.icons .row button.lbl:not([data-i]) span{display:inline}
+
+#refFind{gap:8px;align-items:center}
+#refFind input{flex:1 1 auto;min-width:0;box-sizing:border-box;padding:10px 12px;
+  border:0;border-radius:14px;background:var(--btn);color:var(--ink);font:inherit;font-size:13px}
+#refFind button{flex:0 0 auto;width:var(--btnH)}
+
+#refBody mark{background:transparent;color:var(--hot);font-weight:600}
+#refBody mark.at{background:var(--hot);color:var(--hot2);border-radius:4px}
+#probeF{display:none;width:100%;box-sizing:border-box;margin:8px 0 0;padding:10px 12px;
+  border:0;border-radius:14px;background:#141814;color:#cfe0cf;font:inherit;font-size:13px}
+#probeF.on{display:block}
+#probe .row{flex:0 0 auto}
+.panel.full.open{display:flex;flex-direction:column}
+
+#glassGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;
+  max-height:44vh;overflow-y:auto;padding:2px 0 4px}
+
+#shellRow{display:none;margin-bottom:12px}
+#shellRow.on{display:flex}
+#shellTxt{flex:1;min-height:var(--btnH);border:0;border-radius:var(--rBtn);
+  background:var(--btn);color:var(--ink);font-size:16px;padding:0 12px}
+#frameGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
+
+#frameGrid .gc{position:relative;border:0;padding:6px 2px 8px;border-radius:var(--rBtn);
+  background:var(--btn);display:flex;flex-direction:column;align-items:center;gap:2px}
+#frameGrid .gc .dicebox{width:auto;height:30px}
+#frameGrid .gc .dicebox svg{width:26px;height:26px}
+
+#frameGrid .gc span{font-size:12px;color:var(--dim);line-height:1.1}
+#glassGrid .gc{position:relative;aspect-ratio:1;border:0;padding:0;border-radius:var(--rBtn);
+  overflow:hidden;background:var(--btn);display:block}
+#glassGrid .gc canvas{width:100%;height:100%;display:block}
+#glassGrid .gc span{position:absolute;left:0;right:0;bottom:0;font-size:11px;
+  padding:3px 2px;background:#0009;color:#fff;text-align:center;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#glassGrid .gc.on{outline:2px solid var(--hot);outline-offset:-2px}
+
+#glassGrid .gc.dice{background:var(--hot)}
+#glassGrid .gc.dice .dicebox{color:var(--hot2)}
+#glassGrid .gc.dice span{background:transparent;color:var(--hot2)}
+
+#glassGrid .gc.frames{background:var(--hot)}
+#glassGrid .gc.frames .dicebox{color:var(--hot2)}
+#glassGrid .gc.frames span{background:transparent;color:var(--hot2)}
+
+#frameGrid .gc.on{background:var(--hot)}
+#frameGrid .gc.on .dicebox,#frameGrid .gc.on span{color:var(--hot2)}
+
+#glassGrid .gc.hole{background:transparent;border:1px dashed var(--dim);opacity:.45}
+
+#stkGrid{flex:1 1 auto;overflow-y:auto;display:grid;
+  grid-template-columns:repeat(4,1fr);gap:8px;align-content:start;padding:4px 0 8px}
+#stkGrid .cell{position:relative;aspect-ratio:1;border-radius:var(--rBtn);background:var(--btn);
+  display:flex;align-items:center;justify-content:center;overflow:hidden}
+#stkGrid .cell img{max-width:82%;max-height:82%;display:block;pointer-events:none}
+#stkGrid .cell.on{box-shadow:inset 0 0 0 3px var(--hot)}
+#stkNone{flex:1 1 auto;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:12px}
+.big{color:var(--dim)}
+.big svg{width:104px;height:104px;display:block;fill:none;stroke:currentColor;
+  stroke-width:1.4;stroke-linecap:round;stroke-linejoin:round}
+.big span{display:none}
+#stkNone .note{text-align:center;max-width:70%}
+.leg{display:grid;grid-template-columns:repeat(2,1fr);gap:4px 10px;margin-top:8px}
+.leg div{display:flex;align-items:center;gap:10px;color:var(--dim);font-size:13px;min-height:34px}
+
+.leg svg{width:26px;height:26px;flex:0 0 auto;fill:none;stroke:currentColor;
+  stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.leg .lhead{grid-column:1 / -1;color:var(--ink);font-size:12px;font-weight:600;
+  letter-spacing:.08em;text-transform:uppercase;margin-top:10px;min-height:20px}
+.leg svg .sol{fill:currentColor;stroke:none}
+
+.flags{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:8px}
+.flags button{min-height:var(--btnH);border:0;border-radius:var(--rBtn);background:var(--btn);font-size:20px}
+.links button{background:transparent;color:#7ab7ff;text-decoration:underline;
+  text-align:left;font-weight:500;min-height:36px}
+#mTitle{font-size:19px;font-weight:700;margin:2px 0 2px}
+.made{color:var(--dim);font-size:12px;margin-top:14px}
+.head{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.06em;margin-top:12px}
+.note{color:var(--dim);font-size:13px;margin-top:6px}
+#txt,#fname{width:100%;padding:12px;border:0;border-radius:16px;background:var(--btn);
+  color:var(--ink);font:inherit}
+#txt{min-height:64px;resize:none}
+
+input:focus,textarea:focus{outline:none}
+input,textarea{caret-color:var(--hot)}
+input[type=color]{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+
+.pals{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);
+  gap:4px;margin-top:10px;align-items:start}
+
+#themes, #accents, #mixPick{grid-auto-flow:row;grid-template-columns:repeat(4,1fr)}
+.sw.hole, .swb.hole{background:transparent;border:1px dashed var(--dim);opacity:.45}
+
+.swb span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.sw{justify-self:center;width:var(--swS);height:var(--swS);border-radius:50%;border:2px solid var(--btn2);padding:0}
+
+.sw.on{border-color:var(--ink);border-width:3px}
+.sw.own{background:
+  linear-gradient(90deg,rgba(0,0,0,0) 0 50%,var(--own,rgba(0,0,0,0)) 50% 100%),
+  conic-gradient(from 180deg,#e01b24,#ffd400,#1e9e4a,#00bcd4,#1a6fd4,#8e24aa,#e01b24)}
+
+input[type=range]{flex:1 1 auto;accent-color:var(--hot);min-width:80px;margin-right:14px}
+
+input[type=range].dent{background-image:linear-gradient(var(--dim), var(--dim));
+  background-repeat:no-repeat;background-position:var(--dentPos, 50%) center;
+  background-size:2px 14px}
+
+#easyRow{position:relative}
+
+.awayFix,.awayZoom,.awayGeo,.awayHist{transition:opacity .18s ease, transform .18s ease}
+#easyRow.fixon .awayFix,#easyRow.zoomon .awayZoom,#easyRow.geoon .awayGeo,#easyRow.histon .awayHist{opacity:0;transform:translateX(14px);pointer-events:none}
+#easyRow.geoon #bEGeo{order:-1}
+
+#easyRow.zoomon #bEZoom{order:-1}
+
+#easyRow.histon #bHist{order:-1}
+.easywrap{position:absolute;left:calc(var(--leadW) + 6px);right:0;top:0;bottom:0;
+  display:flex;align-items:center;opacity:0;pointer-events:none;
+  transition:opacity .18s ease}
+#easyRow.fixon #easyWrap,#easyRow.zoomon #zoomWrap,#easyRow.geoon #geoWrap,#easyRow.histon #histWrap{opacity:1}
+
+#easyRow.fixon.ready #easyWrap,#easyRow.zoomon.ready #zoomWrap,#easyRow.geoon.ready #geoWrap,#easyRow.histon.ready #histWrap{pointer-events:auto}
+
+input[type=range].pits{background-repeat:no-repeat;background-size:2px 12px}
+
+#pkCell{display:flex;align-items:center;justify-content:center}
+#pkDot{display:block;width:40px;height:40px;border-radius:50%;border:2px solid var(--btn2);
+  background:var(--btn);pointer-events:none}
+#picker{z-index:12}
+
+#picker .lab{text-align:left}
+#picker input[type=range]{height:26px;border-radius:13px;-webkit-appearance:none;appearance:none}
+#picker input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:26px;height:26px;
+  border-radius:50%;background:#fff;border:2px solid #00000055}
+
+.row button.lbl.lead{flex:0 0 auto;width:var(--leadW);min-width:0;
+  align-self:center}
+
+.row.lead2{align-items:center}
+.slcol{flex:1 1 auto;min-width:0}
+.slcol .row{margin-top:0}
+.slcol .row + .row{margin-top:6px}
+
+.dotcell{flex:0 0 auto;width:var(--leadW);display:flex;flex-direction:column;
+  align-items:center;gap:5px}
+.dotlab{color:var(--dim);font-size:11px;line-height:1;max-width:100%;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dotbox{flex:0 0 auto;width:52px;height:52px;border-radius:50%;background:var(--btn);
+  display:flex;align-items:center;justify-content:center}
+#inkDot{display:block;width:10px;height:10px;border-radius:50%;background:var(--btn2)}
+#szW,#szH{min-width:0;min-height:var(--btnH);border:0;border-radius:var(--rBtn);
+  background:var(--btn);color:var(--ink);font:inherit;font-size:22px;text-align:center}
+
+#duoFlip.rev svg{transform:scaleX(-1)}
+#szModes>button.swb{align-self:center}
+
+#szModes button span{display:none}
+#szRow button span{display:none}
+
+.lab{flex:0 0 var(--leadW);min-width:0;color:var(--dim);
+  font-size:clamp(10px,3.4vw,13px);overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap}
+
+#dock{position:absolute;left:0;right:0;bottom:calc(var(--cmd) + var(--cmdGap));
+  z-index:9;display:flex;flex-direction:column;justify-content:flex-end;
+  pointer-events:none}
+#dock > *{pointer-events:auto}
+
+@media (min-aspect-ratio: 3/2){
+
+  #dock{left:auto;right:0;width:var(--rail);top:0;overflow:auto}
+  #cmd{left:auto;right:0;width:var(--rail)}
+
+  .panel{max-height:none;border-radius:20px 0 0 20px}
+
+  #dock{overflow-x:hidden;overflow-y:auto}
+
+  #dock{justify-content:stretch}
+  .panel.open{flex:1 1 auto}
+
+  .panel.full{left:auto;right:0;width:var(--rail);padding-top:16px}
+
+  .row:has(> button:nth-of-type(4)):not(:has(input)){display:grid;grid-template-columns:repeat(4,1fr)}
+
+  .row:has(> button:nth-of-type(4)):not(:has(input)) > button{min-width:0;padding:0 2px}
+
+  #pager{top:8px;right:var(--rail);z-index:10}
+  #hint{position:fixed;left:calc((100% - var(--rail)) / 2);bottom:16px}
+  #floats{position:fixed;right:calc(var(--rail) + 10px);bottom:10px;margin:0}
+
+  #empty{position:fixed;left:0;right:var(--rail);top:45%}
+
+  #bMenu{top:auto;right:auto;left:8px;bottom:8px}
+}
+#floats{position:relative;align-self:flex-end;margin:0 10px 10px 0;
+  display:flex;gap:8px;pointer-events:none}
+
+.flo{width:var(--floS);height:var(--floS);padding:0;border:0;border-radius:var(--rBtn);
+  display:flex;align-items:center;justify-content:center;
+  background:var(--bar);color:var(--ink);box-shadow:0 2px 10px rgba(0,0,0,.35)}
+.flo svg{width:var(--gl);height:var(--gl);stroke:currentColor;stroke-width:1.7;fill:none;
+  stroke-linecap:round;stroke-linejoin:round}
+.flo svg .sol{fill:currentColor;stroke:none}
+.flo span{display:none}
+
+.flo.on{background:var(--hot);color:var(--hot2)}
+#floats button{pointer-events:auto;visibility:hidden}
+#floats button.on{visibility:visible}
+#bFit{width:var(--floS);height:var(--floS);padding:0;border:0;border-radius:var(--rBtn);
+  display:flex;align-items:center;justify-content:center;
+  background:var(--bar);color:var(--ink);box-shadow:0 2px 10px rgba(0,0,0,.35)}
+#bFit svg{width:var(--gl);height:var(--gl);stroke:currentColor;stroke-width:1.7;fill:none;
+  stroke-linecap:round;stroke-linejoin:round}
+#bFit span{display:none}
+
+#bPeek{width:var(--floS);height:var(--floS);padding:0;border:0;border-radius:var(--rBtn);
+  display:flex;align-items:center;justify-content:center;
+  background:var(--bar);color:var(--ink);box-shadow:0 2px 10px rgba(0,0,0,.35)}
+#bPeek.hold{background:var(--btn2)}
+#bPeek svg{width:var(--gl);height:var(--gl);stroke:currentColor;stroke-width:1.7;fill:none;
+  stroke-linecap:round;stroke-linejoin:round}
+#bPeek span{display:none}
+
+#bClipF{width:var(--floS);height:var(--floS);padding:0;border:0;border-radius:var(--rBtn);
+  display:flex;align-items:center;justify-content:center;
+  background:var(--bar);color:var(--ink);box-shadow:0 2px 10px rgba(0,0,0,.35)}
+#bClipF svg{width:var(--gl);height:var(--gl);stroke:currentColor;stroke-width:1.7;fill:none;
+  stroke-linecap:round;stroke-linejoin:round}
+
+#pager{position:fixed;top:var(--topBar);left:0;right:0;z-index:4;display:none;
+  justify-content:center;gap:8px;pointer-events:none}
+#pager.open{display:flex}
+.pager button{pointer-events:auto;min-width:var(--floS);min-height:var(--floS);border:0;border-radius:var(--rBtn);
+  background:var(--bar);color:var(--ink);font:inherit;font-weight:700}
+#pnum{pointer-events:none;padding:8px 14px;border-radius:20px;background:var(--bar);
+  color:var(--dim);font-size:13px}
+
+#empty{position:absolute;left:0;right:0;top:45%;z-index:6;display:flex;gap:10px;
+  justify-content:center;align-items:center}
+#empty.hide{display:none}
+.empty button{min-height:var(--btnH);padding:0 20px;border:0;border-radius:var(--rBtn);background:var(--btn);
+  color:var(--ink);font:inherit;font-weight:600;font-size:15px}
+
+#hint{position:absolute;left:50%;transform:translateX(-50%);bottom:70px;z-index:14;
+  max-width:86%;text-align:center;pointer-events:none;color:var(--ink);font-size:13px;
+  padding:8px 14px;border-radius:14px;background:var(--btn2);box-shadow:0 2px 10px #0007}
+#hint:empty{display:none}
+
+#dbg{position:fixed;left:6px;top:4px;z-index:70;display:none;pointer-events:none;
+  font:600 11px/1.3 ui-monospace,Menlo,Consolas,monospace;letter-spacing:.02em;
+  color:var(--hot);text-shadow:0 1px 3px rgba(0,0,0,.85)}
+#dbg.on{display:block}
+#wait{position:absolute;inset:0;z-index:20;display:none;align-items:center;justify-content:center;
+  background:#000b;font-size:17px}
+#wait.open{display:flex}
+
+.hide{display:none !important}
+
+button.on{background:var(--hot);color:var(--hot2)}
+
+.row.keys.four.cutfoot>button.swb{justify-self:center;align-self:center}
+</style>
+</head>
+<body>
+<svg id="fx" width="1" height="1" aria-hidden="true"
+     style="position:absolute;left:-10px;top:-10px;width:1px;height:1px;overflow:hidden">
+
+  <filter id="jotGlass" color-interpolation-filters="sRGB"
+          filterUnits="userSpaceOnUse" x="0" y="0" width="100000" height="100000">
+    <feColorMatrix id="glassM" type="matrix"
+      values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 1 0"/>
+
+    <feComponentTransfer id="glassT">
+      <feFuncR id="tR" type="table" tableValues="0 1"/>
+      <feFuncG id="tG" type="table" tableValues="0 1"/>
+      <feFuncB id="tB" type="table" tableValues="0 1"/>
+    </feComponentTransfer>
+  </filter>
+
+  <filter id="jotConv" color-interpolation-filters="sRGB"
+          filterUnits="userSpaceOnUse" x="0" y="0" width="100000" height="100000">
+    <feConvolveMatrix id="cvK" order="3" preserveAlpha="true"
+                      kernelMatrix="0 0 0 0 1 0 0 0 0"/>
+    <feGaussianBlur id="cvB" stdDeviation="0"/>
+    <feColorMatrix id="cvM" type="matrix"
+      values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 1 0"/>
+    <feComponentTransfer id="cvT">
+      <feFuncR id="cR" type="table" tableValues="0 1"/>
+      <feFuncG id="cG" type="table" tableValues="0 1"/>
+      <feFuncB id="cB" type="table" tableValues="0 1"/>
+    </feComponentTransfer>
+  </filter>
+
+  <filter id="jotAdj" color-interpolation-filters="sRGB"
+          filterUnits="userSpaceOnUse" x="0" y="0" width="100000" height="100000">
+    <feColorMatrix id="fxSat" type="saturate" values="1"/>
+    <feComponentTransfer id="fxLin">
+      <feFuncR id="lR" type="linear" slope="1" intercept="0"/>
+      <feFuncG id="lG" type="linear" slope="1" intercept="0"/>
+      <feFuncB id="lB" type="linear" slope="1" intercept="0"/>
+    </feComponentTransfer>
+    <feComponentTransfer id="fxGam">
+      <feFuncR id="gR" type="gamma" amplitude="1" exponent="1" offset="0"/>
+      <feFuncG id="gG" type="gamma" amplitude="1" exponent="1" offset="0"/>
+      <feFuncB id="gB" type="gamma" amplitude="1" exponent="1" offset="0"/>
+    </feComponentTransfer>
+    <feGaussianBlur id="fxBlur" stdDeviation="0"/>
+    <feConvolveMatrix id="fxCM" order="3" preserveAlpha="true"
+                      kernelMatrix="0 0 0 0 1 0 0 0 0"/>
+  </filter>
+</svg>
+<canvas id="cv"></canvas>
+
+<button id="bMenu" aria-label="Jot"><svg viewBox="17 28 74 48"><path d="M25.1 46.6 C25.8 45.6 27.4 42.4 29.5 40.6 C31.6 38.8 34.5 36.9 37.6 35.6 C40.7 34.3 44.7 33.4 48.2 33.0 C51.8 32.5 55.6 32.7 58.9 33.0 C62.2 33.3 65.3 34.0 68.2 34.8 C71.2 35.5 73.9 36.3 76.5 37.4 C79.1 38.4 81.9 39.6 83.8 41.2 C85.8 42.7 87.6 44.7 88.2 46.7 C88.9 48.6 88.6 51.0 87.7 53.1 C86.7 55.2 84.7 57.3 82.5 59.1 C80.4 60.9 77.6 62.4 74.9 63.9 C72.2 65.3 69.4 66.5 66.4 67.6 C63.3 68.8 60.2 69.9 56.8 70.7 C53.4 71.4 49.5 72.0 45.9 72.0 C42.4 72.0 38.6 71.5 35.6 70.5 C32.7 69.6 30.1 68.0 28.3 66.4 C26.4 64.8 25.3 62.8 24.5 61.0 C23.6 59.1 23.2 57.2 23.0 55.3 C22.8 53.4 22.6 51.4 23.1 49.3 C23.7 47.3 24.5 45.1 26.1 43.1 C27.8 41.1 30.3 39.1 33.2 37.6 C36.0 36.1 41.6 34.8 43.3 34.2" fill="none" stroke="currentColor" stroke-width="4.6" stroke-linecap="round"/><path d="M43.5 41 L43.5 56 C43.5 60.5 38 62 35 58.5" fill="none" stroke="currentColor" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M54 45.5 a7.5 7.5 0 1 0 0.1 0 z" fill="none" stroke="currentColor" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M67.5 40 L67.5 57.5 C67.5 61 70.5 61.5 72.5 60" fill="none" stroke="currentColor" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M63 46 L73 46" fill="none" stroke="currentColor" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+
+<div id="loupe"><canvas id="loupeC"></canvas></div>
+
+<div id="dock">
+<div id="floats">
+  <button id="bClipF"></button>
+  <button id="bPeek" data-i="peek" data-t="peek"></button>
+  <button id="bFit" data-i="whole" data-t="whole"></button>
+</div>
+
+<div class="pager" id="pager">
+  <button id="pPrev">‹</button><span id="pnum"></span><button id="pNext">›</button>
+</div>
+
+<div class="empty hide" id="empty">
+  <button id="eMenu" data-t="menu"></button>
+  <button id="eOpen" data-t="open"></button>
+</div>
+
+<div id="hint"></div>
+
+<div class="bar" id="bot">
+
+  <div class="row keys four" id="easyRow">
+    <button id="bFix" class="lbl awayZoom awayGeo awayHist" data-i="fix" data-t="fix"></button>
+    <button id="bEZoom" class="lbl awayFix awayGeo awayHist" data-i="ezoom" data-t="ezoom"></button>
+
+    <button id="bHist" class="lbl awayFix awayZoom awayGeo" data-i="hist" data-t="hist"></button>
+    <button id="bEGeo" class="lbl awayFix awayZoom awayHist" data-i="egeo" data-t="egeo"></button>
+
+    <div class="easywrap" id="easyWrap"><input type="range" id="fixSlide" min="0" max="100" value="0"></div>
+
+  <div class="easywrap" id="histWrap"><input type="range" id="histSlide" min="0" max="1" value="1"></div>
+
+    <div class="easywrap" id="zoomWrap"><input type="range" id="zoomSlide" min="0" max="100" value="0"></div>
+
+    <div class="easywrap" id="geoWrap"><div class="slcol">
+      <div class="row"><span class="lab" data-t="uFocus"></span><input type="range" id="gFoc" min="-100" max="100" value="0"></div>
+      <div class="row"><span class="lab" data-t="uAngle"></span><input type="range" id="gAng" min="-45" max="45" value="0"></div>
+    </div></div>
+  </div>
+  <div class="row keys four">
+    <button id="bAdj" class="lbl" data-i="adjust" data-t="adjust"></button>
+    <button id="bDraw" class="lbl" data-i="draw" data-t="draw"></button>
+
+    <button id="bCaps" class="lbl" data-i="etext" data-t="etext"></button>
+    <button id="bGlass" class="lbl" data-i="glass" data-t="glass"></button>
+  </div>
+  <div class="row keys four">
+
+    <button id="bCam" class="lbl" data-i="cam" data-t="cam"></button>
+
+    <button id="bCut" class="lbl" data-i="patch" data-t="cutTool"></button>
+    <button id="bCrop" class="lbl" data-i="crop" data-t="crop"></button>
+    <button id="bTurn" class="lbl" data-i="sheet" data-t="turn"></button>
+  </div>
+</div>
+
+<div class="panel foldable" id="crop">
+
+  <div class="row keys four" id="orients">
+    <button data-g="none" class="on" data-i="gNone" data-t="uNone"></button>
+    <button data-g="thirds" data-i="gThirds" data-t="uThirds"></button>
+    <button data-g="phi" data-i="gPhi" data-t="uPhi"></button>
+    <button data-g="diag" data-i="gDiag" data-t="uDiag"></button>
+  </div>
+
+  <div class="row"><span class="lab" data-t="shape"></span><input type="range" id="mask" min="0" max="100" value="0"></div>
+
+  <div class="note" id="cropNow"></div>
+  <div class="row foot">
+    <button id="cropNo" class="lbl back" data-i="more" data-t="more"></button>
+    <button id="bOrient" class="lbl" data-i="vert" data-t="vert"></button>
+    <button id="bFree" class="lbl" data-i="ratioFree" data-t="free"></button>
+    <button id="bRatio" class="lbl ratiocell" data-t="orig"></button>
+  </div>
+</div>
+
+<div class="panel foldable" id="picker">
+  <div class="row"><span class="lab" data-t="hue"></span><input type="range" id="pkH" min="0" max="360" value="0"></div>
+  <div class="row"><span class="lab" data-t="sat"></span><input type="range" id="pkS" min="0" max="100" value="100"></div>
+  <div class="row"><span class="lab" data-t="val"></span><input type="range" id="pkV" min="0" max="100" value="100"></div>
+  <div class="row foot">
+    <button id="pkNo" class="lbl back" data-i="more" data-t="more"></button>
+    <button id="pkOk" class="lbl ok" data-i="tick" data-t="pick"></button>
+
+    <button id="pkCell" class="lbl"><span id="pkDot"></span></button>
+  </div>
+</div>
+
+<div class="panel full" id="stk">
+  <div class="head" data-t="stickers"></div>
+  <div id="stkGrid"></div>
+  <div id="stkNone" class="hide">
+    <div class="big" data-i="pack" data-t="stickers"></div>
+    <div class="note" data-t="nStk"></div>
+  </div>
+  <div class="note" id="stkHint" data-t="nStkUse"></div>
+
+  <div class="row foot">
+    <button id="stkClose" class="lbl back" data-i="more" data-t="more"></button>
+    <button id="stkPut" class="lbl" data-i="place" data-t="put"></button>
+    <button id="stkDel" class="lbl" data-i="del" data-t="del"></button>
+    <button id="stkAdd" class="lbl" data-i="addpic" data-t="fromFile"></button>
+  </div>
+</div>
+
+<div class="panel foldable" id="turn">
+
+  <div class="row keys four" id="szRow">
+    <input type="number" id="szW" min="16" max="12000">
+    <input type="number" id="szH" min="16" max="12000">
+    <button id="szProp" data-i="lock" data-t="keepProp"></button>
+    <button id="szDo" data-i="tick" data-t="done"></button>
+  </div>
+
+  <div class="note" id="szNow"></div>
+  <div class="note" data-t="nSize"></div>
+
+    <div class="row keys four" id="turnQ">
+    <button data-turn="1" class="lbl" data-i="turnR" data-t="turnSpin"></button>
+    <button data-turn="-1" class="lbl" data-i="turnL" data-t="turnLeft"></button>
+    <button data-flip="h" class="lbl" data-i="flipH" data-t="turnMir"></button>
+    <button data-flip="v" class="lbl" data-i="flipV" data-t="turnFlip"></button>
+  </div>
+
+  <div class="row"><span class="lab" data-t="tilt"></span><input type="range" id="tilt" min="-100" max="100" value="0"></div>
+
+  <div class="row keys four" id="tiltRow">
+    <button id="turnDone" class="lbl back" data-i="more" data-t="more"></button>
+    <button id="tiltH" class="lbl" data-i="tiltH" data-t="tiltHorz"></button>
+    <button id="tiltV" class="lbl on" data-i="tiltV" data-t="tiltVert"></button>
+    <button id="tiltNone" class="lbl" data-i="reset" data-t="mNone"></button>
+  </div>
+</div>
+
+<div class="panel foldable" id="draw">
+
+  <div class="row keys" id="tools">
+    <button data-tool="eraser" data-i="eraser" data-t="eraser"></button>
+    <button data-tool="brush" class="on" data-i="brush" data-t="brush"></button>
+    <button data-tool="marker" data-i="mark" data-t="mark"></button>
+    <button data-grp="shape" class="grp" data-i="arrow" data-t="shape"></button>
+  </div>
+  <div class="pals" id="inkPal"></div>
+  <div class="row">
+    <span class="dotcell"><span class="dotbox"><span id="inkDot"></span></span><span class="dotlab" data-t="width"></span></span>
+    <input type="range" id="inkW" min="2" max="60" value="10">
+  </div>
+  <div class="row"><span class="lab" data-t="opacity"></span><input type="range" id="inkA" min="10" max="100" value="100"></div>
+  <div class="row" id="softRow"><span class="lab" data-t="soft"></span><input type="range" id="inkS" min="0" max="100" value="0"></div>
+  <div class="row" id="dashRow"><span class="lab" data-t="dash"></span><input type="range" id="inkD" min="0" max="100" value="0"></div>
+
+  <div class="row hide" id="rndRow"><span class="lab" data-t="round"></span><input type="range" id="inkR" min="0" max="100" value="0"></div>
+
+  <div class="row hide" id="popRow"><span class="lab" data-t="tol"></span><input type="range" id="popT" min="2" max="60" value="15"></div>
+  <div class="row hide" id="drawSel">
+    <span class="lab" data-t="rot"></span>
+    <input type="range" id="drot" min="-180" max="180" value="0">
+  </div>
+
+  <div class="row keys four">
+    <button id="bFill" data-i="fillIn" data-t="fillIn"></button>
+    <button id="bBlur" data-i="blurIn" data-t="blurIn"></button>
+    <button id="bTop" data-i="above" data-t="above"></button>
+    <button id="bRev" data-i="reveal" data-t="reveal"></button>
+
+    <button id="bPop" class="hide" data-i="bycolor" data-t="popOne"></button>
+  </div>
+
+  <div class="row foot">
+    <button id="drawDone" class="lbl back" data-i="more" data-t="more"></button>
+    <button id="bGrid" class="lbl" data-i="guide" data-t="uGrid"></button>
+    <button id="bSel" class="lbl" data-i="sel" data-t="sel"></button>
+
+    <button id="drawDel" class="lbl" data-i="del" data-t="del"></button>
+  </div>
+</div>
+
+<div class="panel foldable" id="cut">
+
+  <div class="row keys four" id="cutTools">
+    <button data-ct="brush" class="on" id="bCutLine" data-i="draw" data-t="cutLine"></button>
+    <button data-ct="keep" id="bCutKeep" data-i="keep" data-t="cutKeep"></button>
+    <button data-ct="free" data-i="free" data-t="cutFree"></button>
+    <button data-ct="color" data-i="bycolor" data-t="cutColor"></button>
+  </div>
+
+  <div class="slidebay" id="cutBay">
+    <div class="slide" id="cutSl">
+  <div class="row hide" id="cutTolRow"><span class="lab" data-t="tol"></span><input type="range" id="cutT" min="2" max="60" value="15"></div>
+      <div class="row"><span class="lab" data-t="width"></span><input type="range" id="cutW" min="4" max="120" value="50"></div>
+      <div class="row"><span class="lab" data-t="soft"></span><input type="range" id="cutS" min="0" max="100" value="30"></div>
+      <div class="row"><span class="lab" data-t="zoom"></span><input type="range" id="cutZ" min="2" max="6" value="3"></div>
+
+      <div class="row"><span class="lab" data-t="desk"></span><input type="range" id="desk" min="0" max="100" value="0"></div>
+    </div>
+    <div class="slide away" id="objSl">
+
+      <div class="row"><span class="lab" data-t="size"></span><input type="range" id="pSize2" min="2" max="300" value="40"></div>
+      <div class="row"><span class="lab" data-t="opacity"></span><input type="range" id="pAlpha2" min="15" max="100" value="100"></div>
+      <div class="row"><span class="lab" data-t="rot"></span><input type="range" id="pRot2" min="-180" max="180" value="0"></div>
+    </div>
+  </div>
+
+  <div class="row keys four cutfoot">
+    <button id="cutDel" class="lbl" data-i="del" data-t="del"></button>
+    <button class="swb own" id="cfColor" data-t="cutFill"></button>
+    <button class="swb" id="cfEye" data-swi="eye" data-t="eye"></button>
+    <button class="lbl" id="cutClear" data-i="reset" data-t="mNone"></button>
+  </div>
+  <div class="row keys four" id="cutPlace">
+    <button id="cutDone" class="lbl back" data-i="more" data-t="more"></button>
+    <button id="bSticker2" class="lbl" data-i="addpic" data-t="add"></button>
+    <button id="bPack2" class="lbl" data-i="pack" data-t="stickers"></button>
+    <button id="bGrid3" class="lbl" data-i="guide" data-t="uGrid"></button>
+  </div>
+</div>
+
+<div class="panel foldable keeps" id="glass">
+  <div id="glassGrid"></div>
+
+  <div class="pals stay" id="duoPal"></div>
+
+  <div class="row stay" id="duoRow">
+    <button class="lbl" id="duoReset" data-i="reset" data-t="mNone"></button>
+
+    <button class="lbl" id="duoFlip" data-i="colorflip" data-t="duoFlip"></button>
+    <button id="duoDark" class="lbl swcell" data-sw="1" data-t="duoDark"></button>
+    <button id="duoLite" class="lbl swcell" data-sw="1" data-t="duoLite"></button>
+  </div>
+
+  <div class="row stay lead2">
+    <button id="glassDone" class="lbl lead back" data-i="more" data-t="more"></button>
+
+    <div class="slcol">
+      <div class="row"><span class="lab" data-t="power"></span><input type="range" id="glassK" min="0" max="100" value="100"></div>
+      <div class="row hide" id="bycRow"><span class="lab" data-t="tol"></span><input type="range" id="bycT" min="2" max="100" value="30"></div>
+    </div>
+  </div>
+</div>
+
+<div class="panel foldable sub" id="camPane">
+
+  <div class="row keys four" id="camRow">
+    <button id="camDone" class="lbl back" data-i="more" data-t="more"></button>
+    <button id="camEdit" class="lbl" data-i="edit" data-t="camEdit"></button>
+    <button id="camPut" class="lbl" data-i="addpic" data-t="camPut"></button>
+    <button id="camStk" class="lbl" data-i="pack" data-t="camStk"></button>
+  </div>
+</div>
+
+<div class="panel foldable sub" id="framePane">
+
+  <div class="row stay" id="shellRow">
+    <input type="text" id="shellTxt" maxlength="240">
+  </div>
+  <div class="grid" id="frameGrid"></div>
+  <div class="row stay">
+    <span class="lab" data-t="fEdge"></span>
+    <input type="range" id="frameK" min="0" max="100" value="50">
+  </div>
+
+  <div class="pals" id="frameCols">
+    <button class="swb" data-fc="#ffffff" style="--c:#ffffff" data-t="bgWhite"></button>
+    <button class="swb" data-fc="#000000" style="--c:#000000" data-t="bgBlack"></button>
+    <button class="swb own" data-fc="own" data-t="bgColor"></button>
+    <button id="frameEye" class="swb" data-swi="eye" data-t="eye"></button>
+  </div>
+  <div class="row keys four" id="frameRow">
+    <button id="frameDone" class="lbl back" data-i="more" data-t="more"></button>
+    <button id="frameNone" class="lbl" data-i="reset" data-t="mNone"></button>
+    <button id="frameBack" class="lbl" data-i="glass" data-t="rndTo"></button>
+
+    <button id="frameShell" class="lbl" data-i="fnShell" data-t="gFShell"></button>
+  </div>
+</div>
+<div class="panel foldable sub" id="rndPane">
+
+  <div class="row stay">
+    <span class="lab" data-t="power"></span>
+    <input type="range" id="rndK" min="0" max="100" value="50">
+  </div>
+
+  <div class="row keys four" id="diceRow">
+    <button id="rndDone" class="lbl back" data-i="more" data-t="more"></button>
+    <button id="rndPrev" class="lbl" data-i="back" data-t="rndPrev"></button>
+    <button id="rndNext" class="lbl" data-i="fwd" data-t="rndNext"></button>
+
+    <button id="rndBack" class="lbl" data-i="glass" data-t="rndTo"></button>
+  </div>
+</div>
+
+<div class="panel foldable" id="mix">
+
+  <div class="pals four" id="mixPick">
+    <button class="sw" data-m="0" style="background:#e0332e" aria-label="red"></button>
+    <button class="sw" data-m="1" style="background:#e07a1e" aria-label="orange"></button>
+    <button class="sw" data-m="2" style="background:#d8c020" aria-label="yellow"></button>
+    <button class="sw" data-m="3" style="background:#3aa832" aria-label="green"></button>
+    <button class="sw" data-m="4" style="background:#26a9a0" aria-label="aqua"></button>
+    <button class="sw" data-m="5" style="background:#2f6fd0" aria-label="blue"></button>
+    <button class="sw" data-m="6" style="background:#7a4fd0" aria-label="purple"></button>
+    <button class="sw" data-m="7" style="background:#c53fa0" aria-label="magenta"></button>
+  </div>
+  <div class="row"><span class="labpair"><span class="lab has" id="mixName"></span><span class="num" id="mixVal">0</span></span><input type="range" id="mixSlide" min="-100" max="100" value="0"></div>
+
+  <div class="row foot">
+    <button id="mixDone" class="lbl back" data-i="more" data-t="more"></button>
+
+    <button id="mixWH" class="lbl" data-w="h" data-i="mHue" data-t="mHue"></button>
+    <button id="mixWS" class="lbl" data-w="s" data-i="aSa" data-t="mSat"></button>
+    <button id="mixWL" class="lbl" data-w="l" data-i="aBr" data-t="mLum"></button>
+  </div>
+</div>
+
+<div class="panel foldable" id="adj">
+  <div class="chipwrap ico"><button class="chv l" data-scroll="adjPick" data-dir="-1">‹</button><div class="chips ico four" id="adjPick">
+    <button data-a="br" class="on" data-i="aBr" data-t="aBr"></button>
+    <button data-a="co" data-i="aCo" data-t="aCo"></button>
+    <button data-a="sa" data-i="aSa" data-t="aSa"></button>
+    <button data-a="te" data-i="aTe" data-t="aTe"></button>
+    <button data-a="sh" data-i="aSh" data-t="aSh"></button>
+    <button data-a="bl" data-i="aBl" data-t="aBl"></button>
+    <button data-a="gr" data-i="aGr" data-t="aGr"></button>
+    <button data-a="vi" data-i="aVi" data-t="aVi"></button>
+  </div><button class="chv r" data-scroll="adjPick" data-dir="1">›</button></div>
+
+  <div class="row"><span class="labpair"><span class="lab has" id="adjName"></span><span class="num" id="adjVal">0</span></span><input type="range" id="adjSlide" min="-100" max="100" value="0"></div>
+
+  <div class="row foot">
+    <button id="adjDone" class="lbl back" data-i="more" data-t="more"></button>
+    <button id="bGa" class="lbl" data-a="ga" data-i="aGa" data-t="aGa"></button>
+    <button id="bMix" class="lbl" data-i="aMix" data-t="aMix"></button>
+    <button id="adjReset" class="lbl" data-i="reset" data-t="aReset"></button>
+  </div>
+</div>
+
+<div class="panel foldable" id="sheet">
+  <textarea id="txt" placeholder="" autocapitalize="sentences"></textarea>
+  <div class="pals" id="pal"></div>
+  <div class="row" id="rSize"><span class="lab" data-t="size"></span><input type="range" id="oSize" min="16" max="130" value="45"></div>
+  <div class="row"><span class="lab" data-t="opacity"></span><input type="range" id="alpha" min="15" max="100" value="100"></div>
+  <div class="row" id="rRound"><span class="lab" data-t="round"></span><input type="range" id="round" min="0" max="100" value="35"></div>
+  <div class="row"><span class="lab" data-t="rot"></span><input type="range" id="orot" min="-180" max="180" value="0"></div>
+
+  <div class="row foot">
+    <button id="bDone" class="lbl back" data-i="more" data-t="more"></button>
+    <button id="bKind" class="lbl" data-i="text" data-t="text"></button>
+    <button id="bNew" class="lbl" data-i="caps" data-t="capNew"></button>
+    <button id="bDel" class="lbl" data-i="del" data-t="del"></button>
+  </div>
+</div>
+
+<div class="panel full" id="ref">
+
+  <div class="row phead">
+    <button id="refClose" class="lbl back" data-i="xmark" data-t="close"></button>
+    <div class="ttl" id="refTitle">Jot</div>
+  </div>
+
+  <div class="row" id="refFind">
+    <input id="refQ" type="text" inputmode="search" autocomplete="off" spellcheck="false" placeholder="">
+    <button id="refGo" data-i="find" data-t="find"></button>
+  </div>
+  <div id="refBody"></div>
+  <div class="head" id="refSigns">Signs</div>
+  <div class="leg" id="legend"></div>
+
+</div>
+
+<div class="panel full" id="probe">
+  <pre id="probeT"></pre>
+  <input id="probeF" type="text" inputmode="search" autocomplete="off">
+  <div class="row keys four">
+    <button id="probeFind" data-i="find" data-t="find"></button>
+    <button id="probeCopy" data-i="copy" data-t="copy"></button>
+    <button id="probeClear" data-i="del" data-t="del"></button>
+    <button id="probeClose" data-i="xmark" data-t="close"></button>
+  </div>
+
+</div>
+
+<div class="panel" id="saver">
+  <div class="head" data-t="name"></div>
+  <input id="fname" type="text" autocapitalize="none" spellcheck="false">
+  <div class="head" data-t="qual"></div>
+  <div class="row" id="fmts">
+    <button data-fmt="jpg92" data-t="q92">JPEG 92</button>
+    <button data-fmt="jpg100" data-t="q100">JPEG 100</button>
+    <button data-fmt="png" data-t="qpng">PNG</button>
+    <button data-fmt="pdf" data-t="qpdf">PDF</button>
+  </div>
+
+  <div class="row foot">
+    <button id="saveNo" class="lbl back" data-i="more" data-t="more"></button>
+    <button class="lbl" id="saveAs" data-i="folderIn" data-t="saveAs"></button>
+
+    <button id="saveHere" class="lbl ok" data-i="save" data-t="saveHere"></button>
+    <button id="bToPack" class="lbl" data-i="pack" data-t="toPack"></button>
+  </div>
+</div>
+
+</div>
+
+<div class="panel full" id="menu">
+
+  <div class="row phead">
+    <button id="menuClose" class="lbl back" data-i="xmark" data-t="close"></button>
+    <div class="ttl" id="mTitle" data-t="settings"></div>
+      </div>
+
+  <div class="head" data-t="lang"></div>
+  <div class="flags" id="flags"></div>
+
+  <div class="head" data-t="theme"></div>
+
+  <div class="pals" id="themes">
+    <button class="swb" data-sw="1" data-th="black" style="--c:#26262b" data-t="thBlack"></button>
+    <button class="swb" data-sw="1" data-th="jot" style="--c:#2e2e34" data-t="thJot"></button>
+    <button class="swb" data-sw="1" data-th="grey" style="--c:#4b4b4b" data-t="thGrey"></button>
+    <button class="swb" data-sw="1" data-th="warm" style="--c:#4f3d2f" data-t="thWarm"></button>
+    <button class="swb" data-sw="1" data-th="light" style="--c:#d8d8e0" data-t="thLight"></button>
+
+    <button class="swb" data-sw="1" data-th="night" style="--c:#101318" data-t="thNight"></button>
+    <button class="swb" data-sw="1" data-th="pine" style="--c:#121814" data-t="thPine"></button>
+    <button id="bFb" class="swb" data-swi="fbSnd" data-t="fb"></button>
+  </div>
+
+  <div class="head" data-t="accent"></div>
+  <div class="pals" id="accents">
+    <button class="sw" data-ac="none" id="acNone"></button>
+    <button class="sw" data-ac="red" style="background:#e01b24"></button>
+    <button class="sw" data-ac="teal" style="background:#006a6a"></button>
+    <button class="sw" data-ac="purple" style="background:#6750a4"></button>
+    <button class="sw" data-ac="berry" style="background:#984061"></button>
+    <button class="sw" data-ac="amber" style="background:#fdcd05"></button>
+    <button class="sw" data-ac="sky" style="background:#8ab4f8"></button>
+    <button class="sw" data-ac="moss" style="background:#81c995"></button>
+  </div>
+
+  <div class="row keys four">
+    <button id="bHelp" data-i="help" data-t="help"></button>
+    <button id="bReset" data-t="reset"></button>
+    <button id="bReboot" data-t="reboot"></button>
+    <button id="bHv" data-t="hVoice"></button>
+  </div>
+
+  <div class="head" data-t="about"></div>
+  <div class="note" id="aTitle"></div>
+  <div class="note" id="aBody"></div>
+  <div class="note" id="aFmt"></div>
+  <div class="note" id="aGest"></div>
+  <div class="note" id="aTiff"></div>
+  <div class="note" id="aPriv"></div>
+  <div class="note" id="aMade"></div>
+
+  <div class="head" data-t="links"></div>
+
+  <div class="row links" id="links">
+    <button data-url="https://github.com/Shumtugle/jot">github.com/Shumtugle/jot</button>
+  </div>
+  <div class="row links">
+    <button data-url="https://claude.ai">claude.ai</button>
+  </div>
+
+  <div class="row keys four" id="maint">
+    <button id="dbgOn" data-beta="1">debug badge</button>
+    <button id="bLite" data-t="lite"></button>
+    <button id="bProbe" data-beta="1">log</button>
+    <button id="bBeta">BETA</button>
+  </div>
+  <div class="made">generated by AI · 3.327.0</div>
+</div>
+
+<div id="dbg"></div>
+
+<div class="bar" id="cmd">
+  <button id="bOpen2" data-i="open" data-t="open"></button>
+  <button id="bSave" data-i="save" data-t="save"></button>
+  <button id="bShare" data-i="share" data-t="share"></button>
+  <button id="bUndo" data-i="undo" data-t="undo"></button>
+
+  <div id="ringdot"><i></i></div>
+</div>
+
+<div id="wait">…</div>
+<input type="file" id="file" accept="image/*,application/pdf" class="hide">
+
+<script>
+/*JS*/
+</script>
+</body>
+</html>
